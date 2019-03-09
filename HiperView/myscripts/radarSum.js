@@ -46,7 +46,7 @@ d3.radar = function () {
         // TESTING ZONE
         let scagOptions ={
             startBinGridSize: 30,
-            minBins: 50,
+            minBins: 20,
             maxBins: 150,
             outlyingCoefficient: 1.5,
             incrementA:2,
@@ -55,6 +55,10 @@ d3.radar = function () {
             decrementB:0,
         };
         // scag = scagnosticsnd(handledata(index), scagOptions);
+        if (lastIndex==8)
+            debugger;
+        console.log(dataSpider3.length);
+
         scag = scagnosticsnd(dataSpider3.map(d=>{
             var dd = d.map(k=>k.value);
             dd.data = d.name;

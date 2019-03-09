@@ -1018,7 +1018,7 @@ function plotResult(result) {
     var hpcc_node = +name.split("-")[2].split(".")[0];
     var xStart = racksnewor[(hpcc_rack - 1)].x+15;
     // var xStart = racks[hpcc_rack - 1].x+15;
-    xTimeScale.range([xStart, xStart+Math.min(w_rack-node_size,node_size*maxstack)]); // output
+    xTimeScale.range([xStart, xStart+Math.min(w_rack-node_size*scalewidthnode,node_size*maxstack*scalewidthnode)]); // output
         // .range([xStart, xStart+w_rack/2-2*node_size]); // output
     var y = getHostY(hpcc_rack,hpcc_node);
 
@@ -1103,7 +1103,7 @@ function plotHeat(arr,name,hpcc_rack,hpcc_node,xStart,y,minTime,maxTime){
             .attr("class", name)
             .attr("x", x)
             .attr("y", y-10)
-            .attr("width", node_size)
+            .attr("width", node_size*scalewidthnode)
             .attr("height", node_size )
             .attr("fill", function (d) {
                 if (obj.temp1==undefinedValue)
@@ -1126,7 +1126,7 @@ function plotHeat(arr,name,hpcc_rack,hpcc_node,xStart,y,minTime,maxTime){
                 .attr("class", name)
                 .attr("x", x)
                 .attr("y", y+node_size-9)
-                .attr("width", node_size)
+                .attr("width", node_size*scalewidthnode)
                 .attr("height", node_size )
                 .attr("fill", function (d) {
                     if (obj.temp2==undefinedValue)
@@ -1444,6 +1444,7 @@ function addDatasetsOptions() {
         el["data-image"]="images/"+serviceList[i]+".png";
         select.appendChild(el);
     }
+    d3.select(select).on("change",loadNewData);
     document.getElementById('datasetsSelect').value = initialService;  //************************************************
     selectedService = document.getElementById("datasetsSelect").value;
     //loadData();
