@@ -72,8 +72,8 @@ var startDate = new Date("4/1/2018");
 var endtDate = new Date("1/1/2019");
 var today = new Date();
 
-var maxHostinRack= 30;//60;
-var h_rack = 580;//980;
+var maxHostinRack= 60;//60;
+var h_rack = 980;//980;
 var w_rack = (width-23)/10-1;
 var w_gap =0;
 var node_size = 6;
@@ -242,20 +242,14 @@ function initDetailView() {
             newl.pos = 0;
             newl.x = d.x;
             newl.y = d.y;
-            newl.hosts = d.hosts.filter(e => e.hpcc_node % 2);
+            newl.hosts = d.hosts;
             racksnewor.push(newl);
-            var newr = {};
-            newr.id = d.id;
-            newr.pos = 1;
-            newr.x = d.x + w_rack / 2 - 4;
-            newr.y = d.y;
-            newr.hosts = d.hosts.filter(e => !(e.hpcc_node % 2));
-            racksnewor.push(newr);
+
 
         });
 
         svgStore.detailView.selectAll(".rackRect")
-            .data(racksnewor)
+            .data(racks)
             .enter().append("rect")
             .attr("class", "rackRect")
             .attr("x", function (d, i) {
@@ -266,7 +260,7 @@ function initDetailView() {
             })
             .attr("rx", 10)
             .attr("ry", 10)
-            .attr("width", (d, i) => (w_rack / 2 - 4))
+            .attr("width", (d, i) => (w_rack - 4))
             .attr("height", h_rack)
             .attr("fill", "#fff")
             .attr("stroke", "#000")
@@ -277,7 +271,7 @@ function initDetailView() {
             .enter().append("text")
             .attr("class", "rackRectText1")
             .attr("x", function (d) {
-                return d.x + w_rack / 2 - 20;
+                return d.x + w_rack/2 - 20;
             })
             .attr("y", function (d) {
                 return d.y - 6;
@@ -322,8 +316,8 @@ function initDetailView() {
             var name = hosts[i].name;
             var hpcc_rack = +name.split("-")[1];
             var hpcc_node = +name.split("-")[2].split(".")[0];
-            var xStart = racksnewor[(hpcc_rack - 1) * 2 + (hpcc_node % 2 ? 0 : 1)].x - 2;
-            var yy = getHostY(hpcc_rack, hpcc_node, hpcc_node % 2);
+            var xStart = racksnewor[hpcc_rack - 1].x - 2;
+            var yy = getHostY(hpcc_rack, hpcc_node);
             // set opacity for current measurement text
             hosts[i].mOpacity = 0.1;
 
@@ -341,7 +335,7 @@ function initDetailView() {
 
             svgStore.detailView.append("text")
                 .attr("class", "measure_" + hosts[i].name)
-                .attr("x", xStart + w_rack / 2 - 20)
+                .attr("x", xStart  - 20)
                 .attr("y", yy - 4)
                 .attr("fill", "#000")
                 .attr("fill-opacity", hosts[i].mOpacity)
@@ -416,11 +410,9 @@ function main() {
         if (rackx !== racky){
             return rackx-racky;
         }else {
-            if (x % 2 - y % 2) {
-                return y % 2 - x % 2
-            } else {
+
                 return x - y
-            }
+
         }
     });
     radarChartsumopt.scaleDensity= d3.scaleLinear().domain([1,hosts.length]).range([0.3, 0.75]);
@@ -612,7 +604,7 @@ function request(){
                     hosts[i].mOpacity = 1;
                     hosts[i].xOpacity = currentHostX + 38;
 
-                    if (hosts[i].xOpacity > (racksnewor[(hosts[i].hpcc_rack - 1) * 2 + (hosts[i].hpcc_node % 2 ? 0 : 1)].x - 2) + width / 2)
+                    if (hosts[i].xOpacity>racks[hosts[i].hpcc_rack - 1].x+w_rack-20)
                         hosts[i].mOpacity = 0;
 
                     var mea = currentMeasure;
@@ -1004,7 +996,7 @@ function gaussianRand() {
 function gaussianRandom(start, end) {
     return Math.floor(start + gaussianRand() * (end - start + 1));
 }
-
+var scalewidthnode = 4;
 var hostfirst;
 function plotResult(result) {
     // Check if we should reset the starting point
@@ -1024,11 +1016,11 @@ function plotResult(result) {
     var r = hostResults[name];
     var hpcc_rack = +name.split("-")[1];
     var hpcc_node = +name.split("-")[2].split(".")[0];
-    var xStart = racksnewor[(hpcc_rack - 1)*2 + (hpcc_node%2?0:1)].x+15;
+    var xStart = racksnewor[(hpcc_rack - 1)].x+15;
     // var xStart = racks[hpcc_rack - 1].x+15;
-    xTimeScale.range([xStart, xStart+Math.min(w_rack/2-2*node_size,node_size*maxstack)]); // output
+    xTimeScale.range([xStart, xStart+Math.min(w_rack-node_size,node_size*maxstack)]); // output
         // .range([xStart, xStart+w_rack/2-2*node_size]); // output
-    var y = getHostY(hpcc_rack,hpcc_node,hpcc_node%2);
+    var y = getHostY(hpcc_rack,hpcc_node);
 
 
     // Process the array of historical temperatures ***************************************
@@ -1079,7 +1071,7 @@ function plotResult(result) {
             break;
         case "Area Chart":
             initDetailView();
-            plotArea(arr, name, hpcc_rack, hpcc_node, xStart, y);
+            plotArea(arr, name, hpcc_rack, hpcc_node, xStart, y,startinde);
             break;
         case "T-sne Chart":
             initTsneView();
@@ -1157,7 +1149,7 @@ function plotHeat(arr,name,hpcc_rack,hpcc_node,xStart,y,minTime,maxTime){
     /// drawSummaryAreaChart(hpcc_rack, xStart);
 }
 
-function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y){
+function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y,startinde){
     var yScale = d3.scaleLinear()
         .domain([baseTemperature, 120]) //  baseTemperature=60
         .range([0, 22]); // output
@@ -1187,7 +1179,7 @@ function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y){
             return color(d[d.length-1].temp1);
         })
 
-    drawSummaryAreaChart(hpcc_rack, xStart);
+    drawSummaryAreaChart(hpcc_rack, xTimeScale(0),startinde);
 }
 
 function plotTsne(nameh){
@@ -1228,7 +1220,7 @@ function plotTsne(nameh){
     }
     TSneplot.data(arr).draw(nameh);
 }
-function drawSummaryAreaChart(rack, xStart) {
+function drawSummaryAreaChart(rack, xStart, startIndex) {
     var arr2 = [];
     var binStep = 8; // pixels
     var maxX = 0;  // The latest x position, to draw the baseline 60 F
@@ -1237,7 +1229,7 @@ function drawSummaryAreaChart(rack, xStart) {
         var hpcc_node = +att.split("-")[2].split(".")[0];
         if (hpcc_rack == rack) {
             var r = hostResults[att];
-            for (var i = 0; i < r.arr.length; i++) {
+            for (var i = startIndex; i < r.arr.length; i++) {
                 var a = processData(r.arr[i].data.service.plugin_output, selectedService);
                 var obj = {};
                 obj.temp1 = a[0];
@@ -1260,7 +1252,7 @@ function drawSummaryAreaChart(rack, xStart) {
         if (arr2[att].length>=2){
             var max = 0;
             var min = 1000;
-            for (var j=0; j< arr2[att].length; j++) {
+            for (var j=startIndex; j< arr2[att].length; j++) {
                 var temp1 = arr2[att][j].temp1;
                 if (temp1 > max)
                     max = temp1;
