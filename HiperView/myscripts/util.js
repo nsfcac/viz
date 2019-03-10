@@ -15,7 +15,7 @@ var x = d3.scaleLinear()
 var slider = svgLengend.append("g")
     .attr("class", "slider")
     .attr("transform", "translate(" + 116 + "," + 63+ ")");
-
+h
 slider.append("line")
     .attr("class", "track")
     .attr("x1", x.range()[0])

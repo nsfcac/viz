@@ -94,7 +94,7 @@ var simDurationinit = 0;
 var numberOfMinutes = 26*60;
 
 var iterationstep = 1;
-var maxstack =7;
+var maxstack =24;
 var normalTs =0.6; //time sampling
 // var timesteppixel = 0.1; // for 4
 var timesteppixel = 0.1; // for 26
@@ -996,7 +996,7 @@ function gaussianRand() {
 function gaussianRandom(start, end) {
     return Math.floor(start + gaussianRand() * (end - start + 1));
 }
-var scalewidthnode = 4;
+var scalewidthnode = 1;
 var hostfirst;
 function plotResult(result) {
     // Check if we should reset the starting point
