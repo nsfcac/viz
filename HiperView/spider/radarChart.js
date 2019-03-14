@@ -184,7 +184,7 @@ function RadarChart(id, data, options, name) {
             .style("stroke-opacity", 1)
             .style("fill-opacity", cfg.opacityCircles)
             .style("filter", "url(#glow)")
-            .style("visibility", (d, i) => (cfg.bin && i == 0) ? "hidden" : "visible");
+            .style("visibility", (d, i) => ((cfg.bin||!cfg.showText) && i == 0) ? "hidden" : "visible");
 
 
         /////////////////////////////////////////////////////////
@@ -202,10 +202,10 @@ function RadarChart(id, data, options, name) {
             .attr("x1", 0)
             .attr("y1", 0)
             .attr("x2", function (d, i) {
-                return rScale(maxValue * (cfg.bin?((cfg.levels-1)/cfg.levels):1.05)) * Math.cos(angleSlice[i] - Math.PI / 2);
+                return rScale(maxValue * ((cfg.bin||!cfg.showText)?((cfg.levels-1)/cfg.levels):1.05)) * Math.cos(angleSlice[i] - Math.PI / 2);
             })
             .attr("y2", function (d, i) {
-                return rScale(maxValue *( cfg.bin?((cfg.levels-1)/cfg.levels):1.05)) * Math.sin(angleSlice[i] - Math.PI / 2);
+                return rScale(maxValue *( (cfg.bin||!cfg.showText)?((cfg.levels-1)/cfg.levels):1.05)) * Math.sin(angleSlice[i] - Math.PI / 2);
             })
             .attr("class", "line")
             .style("stroke", "white")
@@ -408,50 +408,59 @@ function RadarChart(id, data, options, name) {
     //Update the circles
     blobWrapper = g.selectAll(".radarWrapper");
     //Append the circles
-    var circleWrapper = blobWrapper.selectAll(".radarCircle")
-        .data(function(d,i) { 
-            d.forEach(function(d2){
-                d2.index=i;
-            });
-            return d;
-         })
-        .attr("r", function(d){
-            if (cfg.radiuschange)
-                return 1+Math.pow((d.index+2),0.3);
-            return cfg.dotRadius;
-        })
-        .attr("cx", function(d,i){ return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI/2); })
-        .attr("cy", function(d,i){ return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI/2); })
-        // .style("fill", function(d,i,j) {  return cfg.color(d.index); })
-        .style("fill", function(d){
-            return colorTemperature(d.value);
-        })
-        .style("fill-opacity", 0.5)
-        .style("stroke", "#000")
-        .style("stroke-width", 0.2)
-        .style("visibility", (d, i) => (cfg.bin ) ? "hidden" : "visible");
-    circleWrapper.exit().remove();
-    circleWrapper
-        .enter().append("circle")
-        .attr("class", "radarCircle")
-        .attr("r", function(d){
-            if (cfg.radiuschange)
-                return 1+Math.pow((d.index+2),0.3);
-            return cfg.dotRadius;
-        })
-        .attr("cx", function(d,i){ return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI/2); })
-        .attr("cy", function(d,i){ return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI/2); })
-       // .style("fill", function(d,i,j) {  return cfg.color(d.index); })
-        .style("fill", function(d){
-            return colorTemperature(d.value);
-        })
-        .style("fill-opacity", 0.5)
-        .style("stroke", "#000")
-        .style("stroke-width", 0.2)
-        .style("visibility", (d, i) => (cfg.bin ) ? "hidden" : "visible");
+    if (cfg.showText) {
+        var circleWrapper = blobWrapper.selectAll(".radarCircle")
+            .data(function (d, i) {
+                d.forEach(function (d2) {
+                    d2.index = i;
+                });
+                return d;
+            })
+            .attr("r", function (d) {
+                if (cfg.radiuschange)
+                    return 1 + Math.pow((d.index + 2), 0.3);
+                return cfg.dotRadius;
+            })
+            .attr("cx", function (d, i) {
+                return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI / 2);
+            })
+            .attr("cy", function (d, i) {
+                return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI / 2);
+            })
+            // .style("fill", function(d,i,j) {  return cfg.color(d.index); })
+            .style("fill", function (d) {
+                return colorTemperature(d.value);
+            })
+            .style("fill-opacity", 0.5)
+            .style("stroke", "#000")
+            .style("stroke-width", 0.2)
+            .style("visibility", (d, i) => (cfg.bin || cfg.showText) ? "hidden" : "visible");
+        circleWrapper.exit().remove();
+        circleWrapper
+            .enter().append("circle")
+            .attr("class", "radarCircle")
+            .attr("r", function (d) {
+                if (cfg.radiuschange)
+                    return 1 + Math.pow((d.index + 2), 0.3);
+                return cfg.dotRadius;
+            })
+            .attr("cx", function (d, i) {
+                return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI / 2);
+            })
+            .attr("cy", function (d, i) {
+                return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI / 2);
+            })
+            // .style("fill", function(d,i,j) {  return cfg.color(d.index); })
+            .style("fill", function (d) {
+                return colorTemperature(d.value);
+            })
+            .style("fill-opacity", 0.5)
+            .style("stroke", "#000")
+            .style("stroke-width", 0.2)
+            .style("visibility", (d, i) => (cfg.bin || cfg.showText) ? "hidden" : "visible");
 
 
-
+    }
     //Append the backgrounds
     // blobWrapper
     //     .append("path")
@@ -481,60 +490,71 @@ function RadarChart(id, data, options, name) {
     /////////////////////////////////////////////////////////
     
     //Wrapper for the invisible circles on top
-    var blobCircleWrapperg = g.selectAll(".radarCircleWrapper")
-        .data(data);
-    blobCircleWrapperg.exit().remove();
-    blobCircleWrapperg.enter().append("g")
-        .attr("class", "radarCircleWrapper");
-    var blobCircleWrapper = g.selectAll(".radarCircleWrapper");
-    //Append a set of invisible circles on top for the mouseover pop-up
-    var blobCircleWrappergg = blobCircleWrapper.selectAll(".radarInvisibleCircle")
-        .data(function(d,i) { return d; })
-        .attr("r", cfg.dotRadius*1.5)
-        .attr("cx", function(d,i){ return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI/2); })
-        .attr("cy", function(d,i){ return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI/2); })
-        .style("fill", "none")
-        .style("pointer-events", "all")
-        .on("mouseenter", function(d,i) {
-            newX =  parseFloat(d3.select(this).attr('cx')) - 10;
-            newY =  parseFloat(d3.select(this).attr('cy')) - 10;
+    if (cfg.showText) {
+        var blobCircleWrapperg = g.selectAll(".radarCircleWrapper")
+            .data(data);
+        blobCircleWrapperg.exit().remove();
+        blobCircleWrapperg.enter().append("g")
+            .attr("class", "radarCircleWrapper");
+        var blobCircleWrapper = g.selectAll(".radarCircleWrapper");
+        //Append a set of invisible circles on top for the mouseover pop-up
+        var blobCircleWrappergg = blobCircleWrapper.selectAll(".radarInvisibleCircle")
+            .data(function (d, i) {
+                return d;
+            })
+            .attr("r", cfg.dotRadius * 1.5)
+            .attr("cx", function (d, i) {
+                return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI / 2);
+            })
+            .attr("cy", function (d, i) {
+                return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI / 2);
+            })
+            .style("fill", "none")
+            .style("pointer-events", "all")
+            .on("mouseenter", function (d, i) {
+                newX = parseFloat(d3.select(this).attr('cx')) - 10;
+                newY = parseFloat(d3.select(this).attr('cy')) - 10;
 
-            tooltip
-                .attr('x', newX)
-                .attr('y', newY)
-                .text(Format(d.value))
-                .transition().duration(200)
-                .style('opacity', 1);
-        })
-        .on("mouseleave", function(){
-            tooltip.transition().duration(200)
-                .style("opacity", 0);
-        });
-    blobCircleWrappergg.exit().remove();
-    blobCircleWrappergg
-        .enter().append("circle")
-        .attr("class", "radarInvisibleCircle")
-        .attr("r", cfg.dotRadius*1.5)
-        .attr("cx", function(d,i){ return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI/2); })
-        .attr("cy", function(d,i){ return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI/2); })
-        .style("fill", "none")
-        .style("pointer-events", "all")
-        .on("mouseenter", function(d,i) {
-            newX =  parseFloat(d3.select(this).attr('cx')) - 10;
-            newY =  parseFloat(d3.select(this).attr('cy')) - 10;
-                    
-            tooltip
-                .attr('x', newX)
-                .attr('y', newY)
-                .text(Format(d.value))
-                .transition().duration(200)
-                .style('opacity', 1);
-        })
-        .on("mouseleave", function(){
-            tooltip.transition().duration(200)
-                .style("opacity", 0);
-        });
-        
+                tooltip
+                    .attr('x', newX)
+                    .attr('y', newY)
+                    .text(Format(d.value))
+                    .transition().duration(200)
+                    .style('opacity', 1);
+            })
+            .on("mouseleave", function () {
+                tooltip.transition().duration(200)
+                    .style("opacity", 0);
+            });
+        blobCircleWrappergg.exit().remove();
+        blobCircleWrappergg
+            .enter().append("circle")
+            .attr("class", "radarInvisibleCircle")
+            .attr("r", cfg.dotRadius * 1.5)
+            .attr("cx", function (d, i) {
+                return rScale(d.value) * Math.cos(angleSlice[i] - Math.PI / 2);
+            })
+            .attr("cy", function (d, i) {
+                return rScale(d.value) * Math.sin(angleSlice[i] - Math.PI / 2);
+            })
+            .style("fill", "none")
+            .style("pointer-events", "all")
+            .on("mouseenter", function (d, i) {
+                newX = parseFloat(d3.select(this).attr('cx')) - 10;
+                newY = parseFloat(d3.select(this).attr('cy')) - 10;
+
+                tooltip
+                    .attr('x', newX)
+                    .attr('y', newY)
+                    .text(Format(d.value))
+                    .transition().duration(200)
+                    .style('opacity', 1);
+            })
+            .on("mouseleave", function () {
+                tooltip.transition().duration(200)
+                    .style("opacity", 0);
+            });
+    }
     //Set up the small tooltip for when you hover over a circle
     var tooltip = g.selectAll(".tooltip");
     if (first) {

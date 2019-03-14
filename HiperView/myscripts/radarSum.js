@@ -11,8 +11,7 @@ var radarChartsumopt  = {
     dotRadius:2,
     maxValue: 0.5,
     roundStrokes: true,
-    showText: false,
-    bin :   true};
+    showText: false};
 d3.radar = function () {
     let startBinGridSize=30,
         isNormalized =false,
@@ -44,65 +43,65 @@ d3.radar = function () {
 
         handledata(index);
         // TESTING ZONE
-        let scagOptions ={
-            startBinGridSize: 30,
-            minBins: 20,
-            maxBins: 100,
-            outlyingCoefficient: 1.5,
-            incrementA:2,
-            incrementB:0,
-            decrementA:0.5,
-            decrementB:0,
-        };
-        // scag = scagnosticsnd(handledata(index), scagOptions);
-        scag = scagnosticsnd(dataSpider3.map(d=>{
-            var dd = d.map(k=>k.value);
-            dd.data = d.name;
-            return dd;}), scagOptions);
-        console.log('Outlying detect: bin='+scag.bins.length);
-        console.log(scag.outlyingPoints.map(d=>d.data));
-        console.log(scag.outlyingBins);
-        let outlyingPoints = [];
-        dataSpider3 = dataSpider3.filter(d=> {
-            let temp2 = scag.outlyingPoints.filter(e=>e.data===d.name);
-            let temp = JSON.parse(JSON.stringify(d));
-            if (temp2.length) {
-                let tempscaleval = [temp2[0]];
-                tempscaleval.val =temp2[0];
-                temp.indexSamp = d.indexSamp;
-                temp.name = d.name;
-                temp.bin ={val: [d.map(k=>k.value)],
-                    name:[temp2[0].data],
-                    scaledval: tempscaleval,
-                    distancefunc: (e)=>0,
-                    distance: 0};
-                outlyingPoints.push(temp);
-                temp.type = "outlying";
-                return 0;
-            }
-            return 1;
-        });
-        //TESTING ZONE
-        bin.data(dataSpider3.map(d=>{
-            var dd = d.map(k=>k.value);
-            dd.data = d.name;
-            return dd;}))
-            .calculate();
-        var keys = dataSpider3[0].map(d=>d.axis);
-        dataSpider3.length = 0;
-        console.log("numBins: "+bin.bins.length);
-        dataSpider3 = bin.bins.map(d=>
-        {   var temp = bin.normalizedFun.scaleBackPoint(d.val).map((e,i)=>{return {axis:keys[i],value:e}});
-            temp.bin ={val: bin.normalizedFun.scaleBackPoints(d),
-                name:d.map(f=>f.data),
-                scaledval: d,
-                distancefunc: (e)=>d3.max(e.map(function(p){return distance(e[0], p)})),
-                distance: d3.max(d.map(function(p){return distance(d.val, p)}))};
-            return temp;});
-        outlyingPoints.forEach(o=> dataSpider3.push(o));
-        console.log('current group + outlying: '+dataSpider3.length);
+        // let scagOptions ={
+        //     startBinGridSize: 30,
+        //     minBins: 20,
+        //     maxBins: 100,
+        //     outlyingCoefficient: 1.5,
+        //     incrementA:2,
+        //     incrementB:0,
+        //     decrementA:0.5,
+        //     decrementB:0,
+        // };
+        // // scag = scagnosticsnd(handledata(index), scagOptions);
+        // scag = scagnosticsnd(dataSpider3.map(d=>{
+        //     var dd = d.map(k=>k.value);
+        //     dd.data = d.name;
+        //     return dd;}), scagOptions);
+        // console.log('Outlying detect: bin='+scag.bins.length);
+        // console.log(scag.outlyingPoints.map(d=>d.data));
+        // console.log(scag.outlyingBins);
+        // let outlyingPoints = [];
+        // dataSpider3 = dataSpider3.filter(d=> {
+        //     let temp2 = scag.outlyingPoints.filter(e=>e.data===d.name);
+        //     let temp = JSON.parse(JSON.stringify(d));
+        //     if (temp2.length) {
+        //         let tempscaleval = [temp2[0]];
+        //         tempscaleval.val =temp2[0];
+        //         temp.indexSamp = d.indexSamp;
+        //         temp.name = d.name;
+        //         temp.bin ={val: [d.map(k=>k.value)],
+        //             name:[temp2[0].data],
+        //             scaledval: tempscaleval,
+        //             distancefunc: (e)=>0,
+        //             distance: 0};
+        //         outlyingPoints.push(temp);
+        //         temp.type = "outlying";
+        //         return 0;
+        //     }
+        //     return 1;
+        // });
+        // //TESTING ZONE
+        // bin.data(dataSpider3.map(d=>{
+        //     var dd = d.map(k=>k.value);
+        //     dd.data = d.name;
+        //     return dd;}))
+        //     .calculate();
+        // var keys = dataSpider3[0].map(d=>d.axis);
+        // dataSpider3.length = 0;
+        // console.log("numBins: "+bin.bins.length);
+        // dataSpider3 = bin.bins.map(d=>
+        // {   var temp = bin.normalizedFun.scaleBackPoint(d.val).map((e,i)=>{return {axis:keys[i],value:e}});
+        //     temp.bin ={val: bin.normalizedFun.scaleBackPoints(d),
+        //         name:d.map(f=>f.data),
+        //         scaledval: d,
+        //         distancefunc: (e)=>d3.max(e.map(function(p){return distance(e[0], p)})),
+        //         distance: d3.max(d.map(function(p){return distance(d.val, p)}))};
+        //     return temp;});
+        // outlyingPoints.forEach(o=> dataSpider3.push(o));
+        // console.log('current group + outlying: '+dataSpider3.length);
         radarChartsumopt.levels = levelsR;
-        //radarChartsumopt.color = color2;
+        radarChartsumopt.color = color2;
         RadarChart(".radar"+((index >= maxstack-1)?(maxstack-1):index), dataSpider3, radarChartsumopt,"");
         bin.data([]);
         if (index >= maxstack-1) radarTimeline.shift();
