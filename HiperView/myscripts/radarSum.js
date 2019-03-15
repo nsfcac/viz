@@ -122,7 +122,7 @@ d3.radar = function () {
                     return "translate(" + xscale(index) + "," + margin + ")";
                 });
 
-        handledata(index,true);
+        handledata(index);
         // bin.updateRadius(false).calculatePoint(dataSpider3.map(d=>{
         //     var dd = d.map(k=>k.value);
         //     dd.data = d.name;
