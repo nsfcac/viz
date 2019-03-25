@@ -267,7 +267,7 @@ function RadarChart(id, data, options, name) {
                 
     //Create a wrapper for the blobs    
     var blobWrapperg = g.selectAll(".radarWrapper")
-        .data(data);
+        .data(data,d=>d.name);
     blobWrapperg.exit().remove();
     var blobWrapper = blobWrapperg
         .enter().append("g")
@@ -292,8 +292,15 @@ function RadarChart(id, data, options, name) {
     }
     function drawOutlying(paths){
         paths.attr("d", d => radarLine(d)).transition()
-            .style("stroke", (d, i) => 'black')
-            .style("stroke-width", () => cfg.strokeWidth + "px")
+            .style("stroke", (d, i) => {return 'black'})
+            .style("stroke-width", () => 1 + "px")
+            //.style("fill-opacity", d => 1)
+            .style("fill", (d, i) => 'none');
+    }
+
+    function drawOutlying2(paths){
+        paths.attr("d", d => radarLine(d))
+            .style("stroke-width", () => 0.5 + "px")
             //.style("fill-opacity", d => 1)
             .style("fill", (d, i) => 'none');
     }
@@ -317,16 +324,16 @@ function RadarChart(id, data, options, name) {
             .call(drawOutlying);
     }else {
         blobWrapperpath.attr("d", d => radarLine(d)).transition()
-            .style("stroke-width", () => cfg.strokeWidth + "px")
-            .style("stroke-opacity", d => cfg.bin ? densityscale(d.bin.val.length) : 0.5)
+            .style("stroke-width", (d) => cfg.strokeWidth + "px")
+            .style("stroke-opacity", d => cfg.bin ? densityscale(d.bin.val.length) : (0.5))
             .style("stroke", (d, i) => cfg.color(i))
             .style("fill", "none");
         //Create the outlines
         blobWrapper.append("path")
             .attr("class", "radarStroke")
             .attr("d", d => radarLine(d)).transition()
-            .style("stroke-width", () => cfg.strokeWidth + "px")
-            .style("stroke-opacity", d => cfg.bin ? densityscale(d.bin.val.length) : 0.5)
+            .style("stroke-width", (d) => (cfg.strokeWidth) + "px")
+            .style("stroke-opacity", d => cfg.bin ? densityscale(d.bin.val.length) : (0.5))
             .style("stroke", (d, i) => cfg.color(i))
             .style("fill", "none");
     }
@@ -383,8 +390,20 @@ function RadarChart(id, data, options, name) {
                         console.log(state);
                         document.querySelectorAll("g[cloned='true']").forEach(node => {
                             var nodes = d3.select(node).selectAll(".radarStroke");
-                            if (state)
+                            if (state) {
                                 nodes.on("mouseleave ", null);
+
+                                newpath = d3.select(node).selectAll('.childSt').data(node.__data__.bin.val.map(dv=>{return dv.map (de=>{return {value:de};})}));
+
+                                newpath   .enter().append('path')
+                                    .attr("class", "childSt").attr('cloned',true)
+                                    .call(drawOutlying2)
+                                    .style('pointer-event','none')
+                                    .style('stroke','red');
+                                newpath.exit().remove();
+                                newpath.call(drawOutlying2).style('stroke','red') .style('pointer-event','none');
+
+                            }
                             else
                                 nodes.on("mouseleave ", function () {
                                     clearclone();
