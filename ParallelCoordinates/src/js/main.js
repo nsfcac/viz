@@ -92,134 +92,149 @@ $( document ).ready(function() {
     discovery('#sideNavbtn');
     //$('.tap-target').tapTarget({onOpen: discovery});
 
-    // let comboBox = d3.select("#listvar");
-    let listOption = d3.merge(conf.serviceLists.map(d=>d.sub.map(e=>{return {service: d.text, arr: conf.serviceListattrnest[d.id].sub[e.id], text:e.text, enable:e.enable}})));
-    // listOption.push({service: 'Rack', arr:'rack', text:'Rack'});
+    // ----------IN PROCESS--------------
     let table = d3.select("#axisSetting").select('tbody');
-    table
-        .selectAll('tr').data(listOption)
-        .join(enter => {
-            const tr = enter.append("tr");
-            tr.attr('data-id',d=>d.arr);
-            const alltr = tr.selectAll('td')
-                .data(d=>[{key:'enable',value:d.enable,type:"checkbox"},{key:'colorBy',value:false,type:"radio"},{key:'text',value:d.text}]).enter()
-                .append("td");
-            alltr.filter(d=>d.type==="radio")
-                .append("input")
-                .attrs(function (d,i){
-                    const pdata = d3.select(this.parentElement.parentElement).datum();
-                    return {
-                        type: "radio",
-                        name: "colorby",
-                        value: pdata.service}
-                }).on('change',function (d){
-                d3.select('tr.axisActive').classed('axisActive', false);
-                d3.select(this.parentElement.parentElement).classed('axisActive', true);
-                changeVar(d3.select(this.parentElement.parentElement).datum())});
-                alltr.filter(d=>d.type==="checkbox")
-                .append("input")
+    let groupdimTable = table.selectAll('tr.dimgroup').data(conf.serviceLists)
+        .enter().append('tr')
+        .attr('class','dimgroup')
+        .append('td')
+        .attr('colspan','3')
+        .append('table');
+
+    let headerDims = groupdimTable.append('thead')
+        .append('tr')
+        .attr('class','dimgroup');
+    headerDims.append('td').append("input")
                 .attrs(function (d,i){
                     return {
                         type: "checkbox",
-                        checked: d.value?"checked":null}
-                }).on('change',function (d){
-                    const pdata = d3.select(this.parentElement.parentElement).datum();
-                    d.value = this.checked;
-                    console.log(pdata.arr)
-                    if(this.checked) {
-                        add_axis(pdata.arr, g);
-                        d3.select(this.parentElement.parentElement).classed('disable', false);
-                    }
-                    else {
-                        remove_axis(pdata.arr, g);
-                        d3.select(this.parentElement.parentElement).classed('disable',true);
-                    }
-                    // TODO required to avoid a bug
-                    var extent = d3.brushSelection(svg.selectAll(".dimension").filter(d=>d==pdata.arr));
-                    if (extent)
-                        extent = extent.map(yscale[d].invert).sort((a,b)=>a-b);
-
-                    xscale.domain(dimensions);
-                    update_ticks(pdata.arr, extent);
-
-                    // reorder list
-                    // const disable_dims = _.difference(listMetric.toArray(),dimensions);
-                    // listMetric.sort(_.union(dimensions,disable_dims));
-
-                    // rerender
-                    d3.select("#foreground").style("opacity", null);
-                    brush();
+                        checked: d.enable?"checked":null}
                 });
-            alltr.filter(d=>d.type===undefined)
-                .text(d=>d.value);
-        });
-    // comboBox
-    //     .selectAll('li').data(listOption)
-    //     .join(enter => enter.append("li") .attr('tabindex','0').append("a")
-    //         .attr('href',"#"))
-    //     .text(d=>{return d.text})
-    //     .on('click',changeVar);
-    // $('tbody').sortable();
-    listMetric = Sortable.create($('tbody')[0], {animation: 150,
-        sort: true,
-        dataIdAttr: 'data-id',
-        filter: ".disable",
-        onStart: function (/**Event*/evt) {
-            evt.oldIndex;  // element index within parent
-            const currentAxis = d3.select(evt.item).datum();
-            const chosenAxis = svg.selectAll(".dimension").filter(d=>d==currentAxis.arr);
-            _.bind(dragstart,chosenAxis.node(),chosenAxis.datum())();
-        },
-        onEnd: function (/**Event*/evt) {
-            var itemEl = evt.item;  // dragged HTMLElement
-            evt.to;    // target list
-            evt.from;  // previous list
-            evt.oldIndex;  // element's old index within old parent
-            evt.newIndex;  // element's new index within new parent
-            evt.clone // the clone element
-            evt.pullMode;  // when item is in another sortable: `"clone"` if cloning, `true` if moving
-            const currentAxis = d3.select(itemEl).datum();
-            const chosenAxis = svg.selectAll(".dimension").filter(d=>d==currentAxis.arr);
-            _.bind(dragend,chosenAxis.node(),chosenAxis.datum())();
-        },
-        onMove: function (/**Event*/evt, /**Event*/originalEvent) {
+    headerDims.append('td').append("input")
+                .attrs(function (d,i){
+                    return {
+                        type: "radio",
+                        name: "colorby",
+                        value: d.text}
+                });
+    headerDims.append('td').text(d=>d.text)
 
-            // Example: https://jsbin.com/nawahef/edit?js,output
-            evt.dragged; // dragged HTMLElement
-            evt.draggedRect; // DOMRect {left, top, right, bottom}
-            evt.related; // HTMLElement on which have guided
-            evt.relatedRect; // DOMRect
-            evt.willInsertAfter; // Boolean that is true if Sortable will insert drag element after target by default
-            originalEvent.clientY; // mouse position
-            // return false; — for cancel
-            // return -1; — insert before target
-            // return 1; — insert after target
-            // console.log(originalEvent);
-            // console.log(d3.event);
-            const currentAxis = d3.select(evt.dragged).datum();
-            const relatedtAxis = d3.select(evt.related).datum();
-            const chosenAxis = svg.selectAll(".dimension").filter(d=>d==currentAxis.arr);
+    // ----------IN PROCESS--------------
 
 
-            d3.event ={};
-            // d3.event.dx = originalEvent.clientY - this.pre; // simulate the drag behavior
-            d3.event.dx = position(relatedtAxis.arr) - position(currentAxis.arr); // simulate the drag behavior
-            d3.event.dx = d3.event.dx + ((d3.event.dx>0)?1:-1)  ;
-            if (!isNaN(d3.event.dx))
-                _.bind(dragged,chosenAxis.node(),chosenAxis.datum())();
 
-        }});
-    // d3.select("tbody").selectAll('tr').call(d3.drag()
-    //     .on("start", function (d) {
-    //         const currentAxis = d3.select(this).datum();
+
+    // let listOption = d3.merge(conf.serviceLists.map(d=>d.sub.map(e=>{return {service: d.text, arr: conf.serviceListattrnest[d.id].sub[e.id], text:e.text, enable:e.enable}})));
+    // listOption.push({service: 'Rack', arr:'rack', text:'Rack'});
+    // let table = d3.select("#axisSetting").select('tbody');
+    // table
+    //     .selectAll('tr').data(listOption)
+    //     .join(enter => {
+    //         const tr = enter.append("tr");
+    //         tr.attr('data-id',d=>d.arr);
+    //         const alltr = tr.selectAll('td')
+    //             .data(d=>[{key:'enable',value:d.enable,type:"checkbox"},{key:'colorBy',value:false,type:"radio"},{key:'text',value:d.text}]).enter()
+    //             .append("td");
+    //         alltr.filter(d=>d.type==="radio")
+    //             .append("input")
+    //             .attrs(function (d,i){
+    //                 const pdata = d3.select(this.parentElement.parentElement).datum();
+    //                 return {
+    //                     type: "radio",
+    //                     name: "colorby",
+    //                     value: pdata.service}
+    //             }).on('change',function (d){
+    //             d3.select('tr.axisActive').classed('axisActive', false);
+    //             d3.select(this.parentElement.parentElement).classed('axisActive', true);
+    //             changeVar(d3.select(this.parentElement.parentElement).datum())});
+    //             alltr.filter(d=>d.type==="checkbox")
+    //             .append("input")
+    //             .attrs(function (d,i){
+    //                 return {
+    //                     type: "checkbox",
+    //                     checked: d.value?"checked":null}
+    //             }).on('change',function (d){
+    //                 const pdata = d3.select(this.parentElement.parentElement).datum();
+    //                 d.value = this.checked;
+    //                 console.log(pdata.arr)
+    //                 if(this.checked) {
+    //                     add_axis(pdata.arr, g);
+    //                     d3.select(this.parentElement.parentElement).classed('disable', false);
+    //                 }
+    //                 else {
+    //                     remove_axis(pdata.arr, g);
+    //                     d3.select(this.parentElement.parentElement).classed('disable',true);
+    //                 }
+    //                 // TODO required to avoid a bug
+    //                 var extent = d3.brushSelection(svg.selectAll(".dimension").filter(d=>d==pdata.arr));
+    //                 if (extent)
+    //                     extent = extent.map(yscale[d].invert).sort((a,b)=>a-b);
+    //
+    //                 xscale.domain(dimensions);
+    //                 update_ticks(pdata.arr, extent);
+    //
+    //                 // reorder list
+    //                 // const disable_dims = _.difference(listMetric.toArray(),dimensions);
+    //                 // listMetric.sort(_.union(dimensions,disable_dims));
+    //
+    //                 // rerender
+    //                 d3.select("#foreground").style("opacity", null);
+    //                 brush();
+    //             });
+    //         alltr.filter(d=>d.type===undefined)
+    //             .text(d=>d.value);
+    //     });
+    //
+    // listMetric = Sortable.create($('tbody')[0], {animation: 150,
+    //     sort: true,
+    //     dataIdAttr: 'data-id',
+    //     filter: ".disable",
+    //     onStart: function (/**Event*/evt) {
+    //         evt.oldIndex;  // element index within parent
+    //         const currentAxis = d3.select(evt.item).datum();
     //         const chosenAxis = svg.selectAll(".dimension").filter(d=>d==currentAxis.arr);
     //         _.bind(dragstart,chosenAxis.node(),chosenAxis.datum())();
-    //     })
-    //     .on("drag", function (){
-    //         const currentAxis = d3.select(this).datum();
+    //     },
+    //     onEnd: function (/**Event*/evt) {
+    //         var itemEl = evt.item;  // dragged HTMLElement
+    //         evt.to;    // target list
+    //         evt.from;  // previous list
+    //         evt.oldIndex;  // element's old index within old parent
+    //         evt.newIndex;  // element's new index within new parent
+    //         evt.clone // the clone element
+    //         evt.pullMode;  // when item is in another sortable: `"clone"` if cloning, `true` if moving
+    //         const currentAxis = d3.select(itemEl).datum();
     //         const chosenAxis = svg.selectAll(".dimension").filter(d=>d==currentAxis.arr);
-    //         _.bind(dragged,chosenAxis.node(),chosenAxis.datum(),'table')();
-    //     }));
+    //         _.bind(dragend,chosenAxis.node(),chosenAxis.datum())();
+    //     },
+    //     onMove: function (/**Event*/evt, /**Event*/originalEvent) {
+    //
+    //         // Example: https://jsbin.com/nawahef/edit?js,output
+    //         evt.dragged; // dragged HTMLElement
+    //         evt.draggedRect; // DOMRect {left, top, right, bottom}
+    //         evt.related; // HTMLElement on which have guided
+    //         evt.relatedRect; // DOMRect
+    //         evt.willInsertAfter; // Boolean that is true if Sortable will insert drag element after target by default
+    //         originalEvent.clientY; // mouse position
+    //         // return false; — for cancel
+    //         // return -1; — insert before target
+    //         // return 1; — insert after target
+    //         // console.log(originalEvent);
+    //         // console.log(d3.event);
+    //         const currentAxis = d3.select(evt.dragged).datum();
+    //         const relatedtAxis = d3.select(evt.related).datum();
+    //         const chosenAxis = svg.selectAll(".dimension").filter(d=>d==currentAxis.arr);
+    //
+    //
+    //         d3.event ={};
+    //         // d3.event.dx = originalEvent.clientY - this.pre; // simulate the drag behavior
+    //         d3.event.dx = position(relatedtAxis.arr) - position(currentAxis.arr); // simulate the drag behavior
+    //         d3.event.dx = d3.event.dx + ((d3.event.dx>0)?1:-1)  ;
+    //         if (!isNaN(d3.event.dx))
+    //             _.bind(dragged,chosenAxis.node(),chosenAxis.datum())();
+    //
+    //     }});
+
     d3.select("#DarkTheme").on("click",switchTheme);
     init();
 });
