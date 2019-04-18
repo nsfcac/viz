@@ -73,7 +73,7 @@ var endtDate = new Date("1/1/2019");
 var today = new Date();
 
 var maxHostinRack= 60;//60;
-var h_rack = 980;//980;
+var h_rack = 1100;//980;
 var w_rack = (width-23)/10-1;
 var w_gap =0;
 var node_size = 6;
@@ -94,7 +94,7 @@ var simDurationinit = 0;
 var numberOfMinutes = 26*60;
 
 var iterationstep = 1;
-var maxstack =24;
+var maxstack =40;
 var normalTs =0.6; //time sampling
 // var timesteppixel = 0.1; // for 4
 var timesteppixel = 0.1; // for 26
@@ -333,17 +333,17 @@ function initDetailView() {
                 .attr("font-family", "sans-serif")
                 .text("" + hpcc_node);
 
-            svgStore.detailView.append("text")
-                .attr("class", "measure_" + hosts[i].name)
-                .attr("x", xStart  - 20)
-                .attr("y", yy - 4)
-                .attr("fill", "#000")
-                .attr("fill-opacity", hosts[i].mOpacity)
-                .style("text-anchor", "end")
-                .style("font-size", "11px")
-                .style("text-shadow", "1px 1px 0 rgba(0, 0, 0")
-                .attr("font-family", "sans-serif")
-                .text("");
+            // svgStore.detailView.append("text")
+            //     .attr("class", "measure_" + hosts[i].name)
+            //     .attr("x", xStart  - 20)
+            //     .attr("y", yy - 4)
+            //     .attr("fill", "#000")
+            //     .attr("fill-opacity", hosts[i].mOpacity)
+            //     .style("text-anchor", "end")
+            //     .style("font-size", "11px")
+            //     .style("text-shadow", "1px 1px 0 rgba(0, 0, 0")
+            //     .attr("font-family", "sans-serif")
+            //     .text("");
         }
     }
     TSneplot.remove();
@@ -424,6 +424,17 @@ function main() {
     // })
 
     // Summary Panel ********************************************************************
+    var maingradient = svg.append("defs").append("linearGradient")
+        .attr("id","mainColor")
+        .attr('x1','0%')
+        .attr('y1','100%')
+        .attr('x2','0%')
+        .attr('y2','0%');
+    maingradient.selectAll('stop').data(arrColor)
+        .enter().append('stop')
+        .attr('offset',(d,i)=> (i-1)/4 )
+        .style('stop-color',d=>d)
+        .style('stop-opacity',(d,i)=>opa.range()[i]);
     svgsum = svg.append("g")
         .attr("class", "summaryGroup")
         .attr("transform","translate(" + 1 + "," + 15 + ")");
@@ -614,9 +625,9 @@ function request(){
                     else if (selectedService == "Power_consumption") {
                         mea = Math.round(currentMeasure);
                     }
-                    svg.selectAll(".measure_" + hosts[i].name)
-                        .attr("fill", color(currentMeasure))
-                        .text(mea);
+                    // svg.selectAll(".measure_" + hosts[i].name)
+                    //     .attr("fill", color(currentMeasure))
+                    //     .text(mea);
                 }
                 else {
                     if (hosts[i].mOpacity > 0)
@@ -626,9 +637,9 @@ function request(){
                 }
 
 
-                svg.selectAll(".measure_" + hosts[i].name)
-                    .attr("fill-opacity", hosts[i].mOpacity)
-                    .attr("x", hosts[i].xOpacity - 10);
+                // svg.selectAll(".measure_" + hosts[i].name)
+                //     .attr("fill-opacity", hosts[i].mOpacity)
+                //     .attr("x", hosts[i].xOpacity - 10);
 
             }
         };
@@ -647,7 +658,7 @@ function request(){
                     let ri = step(iteration, countbuffer);
                     midlehandle(ri);
                     countbuffer++;
-                }while ((countbuffer < hosts.length) && (hosts[countbuffer].hpcc_rack === oldrack) && speedup);
+                }while ((countbuffer < hosts.length)&& speedup);
                 speedup = false;
                 drawprocess();
             }
@@ -1114,8 +1125,6 @@ function plotHeat(arr,name,hpcc_rack,hpcc_node,xStart,y,minTime,maxTime){
             .attr("fill-opacity",function (d) {
                 return opa(obj.temp1);
             })
-            .attr("stroke", "#000")
-            .attr("stroke-width", 0.05)
             .on("mouseover", function (d) {
                 mouseoverNode (this);
             })
@@ -1151,8 +1160,8 @@ function plotHeat(arr,name,hpcc_rack,hpcc_node,xStart,y,minTime,maxTime){
 
 function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y,startinde){
     var yScale = d3.scaleLinear()
-        .domain([baseTemperature, 120]) //  baseTemperature=60
-        .range([0, 22]); // output
+        .domain([(thresholds[0][1]-thresholds[0][0])/2,thresholds[0][1]]) //  baseTemperature=60
+        .range([0, node_size*2]); // output
 
     var area = d3.area()
         .x(function(d) { return d.x; })
@@ -1161,6 +1170,20 @@ function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y,startinde){
         .curve(d3.curveCatmullRom);
 
     svgStore.detailView.selectAll("."+name).remove();
+    svgStore.detailView
+        .append('clipPath').attr("class", name)
+        .attr("id", "cp"+name).append("path")
+        .datum(arr) // 10. Binds data to the line
+        .attr("d", area);
+    svgStore.detailView
+        .append('rect')
+        .attr("class", name)
+        .attr('width',xTimeScale.range()[1]-xTimeScale.range()[0])
+        .attr('height',yScale.range()[1]*2)
+        .attr('x',arr[0].x)
+        .attr('y',y-yScale.range()[1]).attr("fill","url(#mainColor)")
+        .attr("clip-path","url(#cp"+name+")");
+
     svgStore.detailView.append("path")
         .datum(arr) // 10. Binds data to the line
         .attr("class", name)
@@ -1174,12 +1197,12 @@ function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y,startinde){
             mouseoverNode (this);
         })
     ;//.on("mouseout", mouseoutNode);
-    svgStore.detailView.selectAll("."+name).transition().duration(1000)
-        .style("fill",function (d) {
-            return color(d[d.length-1].temp1);
-        })
+    // svgStore.detailView.selectAll("."+name).transition().duration(1000)
+    //     .style("fill",function (d) {
+    //         return color(d[d.length-1].temp1);
+    //     })
 
-    drawSummaryAreaChart(hpcc_rack, xTimeScale(0),startinde);
+    // drawSummaryAreaChart(hpcc_rack, xTimeScale(0),startinde);
 }
 
 function plotTsne(nameh){
