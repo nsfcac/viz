@@ -74,7 +74,7 @@ var today = new Date();
 
 var maxHostinRack= 60;//60;
 var h_rack = 1100;//980;
-var w_rack = (width-23)/10-1;
+var w_rack = (width-23)/10-1-4;
 var w_gap =0;
 var node_size = 6;
 var sHeight=280;  // Summary panel height
@@ -94,7 +94,7 @@ var simDurationinit = 0;
 var numberOfMinutes = 26*60;
 
 var iterationstep = 1;
-var maxstack =40;
+var maxstack =30;
 var normalTs =0.6; //time sampling
 // var timesteppixel = 0.1; // for 4
 var timesteppixel = 0.1; // for 26
@@ -229,7 +229,7 @@ function initDetailView() {
     if (svg.select('.rackRect').empty()) {
         // Draw racks **********************
         for (var i = 0; i < racks.length; i++) {
-            racks[i].x = 35 + racks[i].id * (w_rack + w_gap) - w_rack + 10;
+            racks[i].x = 35 + racks[i].id * (w_rack + w_gap+4) - w_rack + 10;
             racks[i].y = top_margin;
         }
         // add main rack and sub rack
@@ -727,24 +727,24 @@ function drawsummary(initIndex){
 
             break;
         case "Radar":
-            for(var h = 0;h < hosts.length;h++)
-            {
-                var name = hosts[h].name;
-                var r = hostResults[name];
-                // lastIndex = initIndex||(r.arr.length - 1);
-                // boxplot
-                if (lastIndex >= 0) {   // has some data
-                    var arrServices = [];
-                    serviceList.forEach((ser,indx) => {
-                        var obj = {};
-                        var a = processData(r[serviceListattr[indx]][lastIndex].data.service.plugin_output, ser);
-                        obj.a = a;
-                        arrServices.push(obj);})
-                }
-                arrServices.name = name;
-                arr.push(arrServices);
-            }
-            Radarplot.data(arr).draw(temp===undefined?lastIndex:temp);
+            // for(var h = 0;h < hosts.length;h++)
+            // {
+            //     var name = hosts[h].name;
+            //     var r = hostResults[name];
+            //     // lastIndex = initIndex||(r.arr.length - 1);
+            //     // boxplot
+            //     if (lastIndex >= 0) {   // has some data
+            //         var arrServices = [];
+            //         serviceList.forEach((ser,indx) => {
+            //             var obj = {};
+            //             var a = processData(r[serviceListattr[indx]][lastIndex].data.service.plugin_output, ser);
+            //             obj.a = a;
+            //             arrServices.push(obj);})
+            //     }
+            //     arrServices.name = name;
+            //     arr.push(arrServices);
+            // }
+            // Radarplot.data(arr).draw(temp===undefined?lastIndex:temp);
             // Radar Time
             //drawRadarsum(svg, arr, lastIndex, xx-radarsize);
             break;
@@ -767,25 +767,30 @@ function drawsummarypoint(harr){
         case "Scatterplot":
             break;
         case "Radar":
-            for (var i in harr) {
-                var h  = harr[i];
-                var name = hosts[h].name;
-                var r = hostResults[name];
-                // lastIndex = initIndex||(r.arr.length - 1);
-                // boxplot
-                if (lastIndex >= 0) {   // has some data
-                    var arrServices = [];
-                    serviceList.forEach((ser, indx) => {
-                        var obj = {};
-                        var a = processData(r[serviceListattr[indx]][lastIndex].data.service.plugin_output, ser);
-                        obj.a = a;
-                        arrServices.push(obj);
-                    })
-                }
-                arrServices.name = name;
-                arr.push(arrServices);
-            }
-            Radarplot.data(arr).drawpoint(lastIndex);
+            // for (var i in harr) {
+            //     var h  = harr[i];
+            //     var name = hosts[h].name;
+            //     var r = hostResults[name];
+            //     // lastIndex = initIndex||(r.arr.length - 1);
+            //     // boxplot
+            //     if (lastIndex >= 0) {   // has some data
+            //         var arrServices = [];
+            //         serviceList_selected.forEach((ser, indx) => {
+            //             try {
+            //                 var obj = {};
+            //                 let dataextract = r[serviceListattr[indx]][lastIndex];
+            //                 if (dataextract)
+            //                     dataextract = dataextract.data.service.plugin_output;
+            //                 var a = processData(dataextract, ser);
+            //                 obj.a = a;
+            //                 arrServices.push(obj);
+            //             }catch(e){}
+            //         })
+            //     }
+            //     arrServices.name = name;
+            //     arr.push(arrServices);
+            // }
+            // Radarplot.data(arr).drawpoint(lastIndex);
             // Radar Time
             //drawRadarsum(svg, arr, lastIndex, xx-radarsize);
             break;
@@ -850,88 +855,208 @@ function predict (arr,ser){
     }
 }
 
-function processData(str, serviceName) {
-    if (serviceName == serviceList[0]){
-        var a = [];
-        if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
-            a[0] = undefinedValue;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
+// function processData(str, serviceName) {
+//     if (serviceName == serviceList[0]){
+//         var a = [];
+//         if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
+//             a[0] = undefinedValue;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//         }
+//         else{
+//             var arrString =  str.split(" ");
+//             a[0] = +arrString[2]||undefinedValue;
+//             a[1] = +arrString[6]||undefinedValue;
+//             a[2] = +arrString[10]||undefinedValue;
+//         }
+//         return a;
+//     }
+//     else if (serviceName == serviceList[1]){
+//         var a = [];
+//         if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0
+//             || str.indexOf("CPU Load: null")>=0){
+//             a[0] = undefinedValue;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//         }
+//         else{
+//             var arrString =  str.split("CPU Load: ")[1];
+//             a[0] = +arrString;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//         }
+//         return a;
+//     }
+//     else if (serviceName == serviceList[2]) {
+//         var a = [];
+//         if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
+//             a[0] = undefinedValue;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//         }
+//         else{
+//             var arrString =  str.split(" Usage Percentage = ")[1].split(" :: ")[0];
+//             a[0] = +arrString;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//         }
+//         return a;
+//     }
+//     else if (serviceName == serviceList[3]) {
+//         var a = [];
+//         if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
+//             a[0] = undefinedValue;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//             a[3] = undefinedValue;
+//         }
+//         else{
+//             var arr4 =  str.split(" RPM ");
+//             a[0] = +arr4[0].split("FAN_1 ")[1];
+//             a[1] = +arr4[1].split("FAN_2 ")[1];
+//             a[2] = +arr4[2].split("FAN_3 ")[1];
+//             a[3] = +arr4[3].split("FAN_4 ")[1];
+//         }
+//         return a;
+//     }
+//     else if (serviceName == serviceList[4]) {
+//         var a = [];
+//         if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
+//             a[0] = undefinedValue;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//         }
+//         else{
+//             var maxConsumtion = 3.2;  // over 100%
+//             var arr4 =  str.split(" ");
+//             a[0] = +arr4[arr4.length-2]/maxConsumtion;
+//             a[1] = undefinedValue;
+//             a[2] = undefinedValue;
+//         }
+//         return a;
+//     }
+// }
+processData = processData_influxdb;
+var serviceQuery ={
+    nagios_old: ["temperature","cpu+load" ,"memory+usage" ,"fans+health" ,"power+usage"],
+    nagios: {
+        "Temperature":{
+            format: (d)=> `CPU${d} Temp`,
+            "numberOfEntries":2,
+            "type":"json",
+            "query":"CPU_Temperature"
+        },
+        "Job_load":{
+            format: ()=> "cpuusage",
+            "numberOfEntries":1,
+            "type":"json",
+            "query":"CPU_Usage"
+        },
+        "Memory_usage":{
+            "format":()=>"memoryusage",
+            "numberOfEntries":1,
+            "type":"json",
+            "query":"Memory_Usage",
+            "rescale": 1/191.908,
+        },
+        "Fans_speed":{
+            format: (d)=> `FAN_${d}`,
+            "numberOfEntries":4,
+            "type":"json",
+            "query":"Fan_Speed"
+        },
+        "Power_consum":{
+            "format": ()=>"powerusage_watts",
+            "numberOfEntries":1,
+            "type":"json",
+            "query":"Node_Power_Usage",
+            "rescale": 1/3.2,
         }
-        else{
-            var arrString =  str.split(" ");
-            a[0] = +arrString[2]||undefinedValue;
-            a[1] = +arrString[6]||undefinedValue;
-            a[2] = +arrString[10]||undefinedValue;
+    },
+    influxdb: {
+        "Temperature":{
+            "CPU_Temperature" : {
+                format: (d) => `CPU${d} Temp`,
+                "numberOfEntries": 2,
+            },
+            "Inlet_Temperature" : {
+                format: () => `Inlet Temp`,
+                "numberOfEntries": 1,
+            }
+        },
+        "Job_load":{
+            "CPU_Usage": {
+                format: () => "cpuusage",
+                "numberOfEntries": 1,
+            }
+        },
+        "Memory_usage":{
+            "Memory_Usage": {
+                format: () => "memoryusage",
+                "numberOfEntries": 1,
+                "rescale": 100 / 191.908,
+            }
+        },
+        "Fans_speed":{
+            "Fan_Speed" : {
+                format: (d) => `FAN_${d}`,
+                "numberOfEntries": 4,
+            }
+        },
+        "Power_consum":{
+            "Node_Power_Usage" : {
+                "format": () => "powerusage_watts",
+                "numberOfEntries": 1,
+                "rescale": 1 / 3.2,
+            }
+        },
+        "Job_scheduling":{
+            "Job_Info" : {
+                "format": () => "job_data",
+                "numberOfEntries": 1,
+                "type": 'object',
+            }
         }
-        return a;
+    },
+};
+db = 'influxdb'
+function processData_influxdb(result, serviceName) {
+    const serviceAttribute = serviceQuery[db][serviceName];
+    const query_return = d3.keys(serviceAttribute);
+    if (result) {
+        let val = result.results;
+        return d3.merge(query_return.map((s, i) => {
+            if (val[i].series) // no error
+            {
+                const subob = _.object(val[i].series[0].columns, val[i].series[0].values[0]);
+                if (subob.error === "None" || subob.error === null || serviceAttribute[s].type==='object')
+                    return d3.range(serviceAttribute[s].numberOfEntries).map(d => {
+                        const localVal = subob[serviceAttribute[s].format(d + 1)];
+                        if (localVal != null) {
+                            if (serviceAttribute[s].type==='object')
+                                return string2JSON(localVal);
+                            return localVal * (serviceAttribute[s].rescale || 1);
+                        }
+                        else return undefined;
+                    });
+                else
+                    return d3.range(serviceAttribute[s].numberOfEntries).map(d => undefined);
+            } else {
+                return d3.range(serviceAttribute[s].numberOfEntries).map(d => undefined);
+            }
+        }));
     }
-    else if (serviceName == serviceList[1]){
-        var a = [];
-        if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0
-            || str.indexOf("CPU Load: null")>=0){
-            a[0] = undefinedValue;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
-        }
-        else{
-            var arrString =  str.split("CPU Load: ")[1];
-            a[0] = +arrString;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
-        }
-        return a;
-    }
-    else if (serviceName == serviceList[2]) {
-        var a = [];
-        if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
-            a[0] = undefinedValue;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
-        }
-        else{
-            var arrString =  str.split(" Usage Percentage = ")[1].split(" :: ")[0];
-            a[0] = +arrString;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
-        }
-        return a;
-    }
-    else if (serviceName == serviceList[3]) {
-        var a = [];
-        if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
-            a[0] = undefinedValue;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
-            a[3] = undefinedValue;
-        }
-        else{
-            var arr4 =  str.split(" RPM ");
-            a[0] = +arr4[0].split("FAN_1 ")[1];
-            a[1] = +arr4[1].split("FAN_2 ")[1];
-            a[2] = +arr4[2].split("FAN_3 ")[1];
-            a[3] = +arr4[3].split("FAN_4 ")[1];
-        }
-        return a;
-    }
-    else if (serviceName == serviceList[4]) {
-        var a = [];
-        if (str.indexOf("timed out")>=0 || str.indexOf("(No output on stdout)")>=0 || str.indexOf("UNKNOWN")>=0 ){
-            a[0] = undefinedValue;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
-        }
-        else{
-            var maxConsumtion = 3.2;  // over 100%
-            var arr4 =  str.split(" ");
-            a[0] = +arr4[arr4.length-2]/maxConsumtion;
-            a[1] = undefinedValue;
-            a[2] = undefinedValue;
-        }
-        return a;
+    return d3.merge(query_return.map((s, i) => {
+        return d3.range(serviceAttribute[s].numberOfEntries).map(d => undefined);
+    }));
+}
+function string2JSON (str){
+    try {
+        return JSON.parse("["+str.replace(/'/g,'"').replace(/;/g,',')+"]")
+    }catch(e){
+        return undefined;
     }
 }
-
 function decimalColorToHTMLcolor(number) {
     //converts to a integer
     var intnumber = number - 0;
@@ -962,23 +1087,33 @@ function decimalColorToHTMLcolor(number) {
 
 function simulateResults2(hostname,iter, s){
     var newService;
-    if (s == serviceList[0])
-        newService = sampleS[hostname].arrTemperature[iter];
-    else if (s == serviceList[1])
-        newService = sampleS[hostname].arrCPU_load[iter];
-    else if (s == serviceList[2])
-        newService = sampleS[hostname].arrMemory_usage[iter];
-    else if (s == serviceList[3])
-        newService = sampleS[hostname].arrFans_health[iter];
-    else if (s == serviceList[4]) {
-        if (sampleS[hostname]["arrPower_usage"]== undefined) {
+    let serviceIndex =  serviceList.findIndex(d=>d===s);
+    newService = (sampleS[hostname][serviceListattr[serviceIndex]]||[])[iter];
+    if (serviceIndex === 4) {
+        if (sampleS[hostname]["arrPower_usage"]=== undefined && db!=="influxdb") {
             var simisval = handlemissingdata(hostname,iter);
             sampleS[hostname]["arrPower_usage"] = [simisval];
-        }else if (sampleS[hostname]["arrPower_usage"][iter]== undefined){
+        }else if (sampleS[hostname]["arrPower_usage"][iter]=== undefined  && db!=="influxdb"){
             var simisval = handlemissingdata(hostname,iter);
             sampleS[hostname]["arrPower_usage"][iter] = simisval;
         }
         newService = sampleS[hostname]["arrPower_usage"][iter];
+    }
+    if (newService === undefined){
+        newService ={};
+        newService.result = {};
+        newService.result.query_time = query_time;
+        newService.data = {};
+        newService.data.service={};
+        newService.data.service.host_name = hostname;
+        newService.data.service.plugin_output = undefined;
+    }else {
+        if (db === "influxdb")
+            try {
+                newService.result.query_time = d3.timeParse("%Y-%m-%dT%H:%M:%S.%LZ")(newService.result.query_time).getTime();
+            }catch(e){
+
+            }
     }
     return newService;
 }
@@ -1116,6 +1251,8 @@ function plotHeat(arr,name,hpcc_rack,hpcc_node,xStart,y,minTime,maxTime){
             .attr("y", y-10)
             .attr("width", node_size*scalewidthnode)
             .attr("height", node_size )
+            .attr("stroke", "#000")
+            .attr("stroke-width", 0.05)
             .attr("fill", function (d) {
                 if (obj.temp1==undefinedValue)
                     return undefinedColor;
@@ -1451,7 +1588,7 @@ function resetRequest(){
     Radarplot.init();
     TSneplot.reset(true);
     timelog = [];
-    updateTimeText();
+    // updateTimeText();
     request();
 }
 function loadData(){
@@ -1640,11 +1777,11 @@ $( document ).ready(function() {
                 break;
             case "Boxplot":
             case "Radar":
-                svg.selectAll(".graphsum").remove();
-                d3.select("#scatterzone").style("visibility","hidden");
-                for (var i =currentlastIndex>(maxstack-2)?(currentlastIndex-maxstack+2):0; i<(currentlastIndex+1);i++) {
-                    drawsummary(i);
-                }
+                // svg.selectAll(".graphsum").remove();
+                // d3.select("#scatterzone").style("visibility","hidden");
+                // for (var i =currentlastIndex>(maxstack-2)?(currentlastIndex-maxstack+2):0; i<(currentlastIndex+1);i++) {
+                //     drawsummary(i);
+                // }
                 break;
         }
     });
