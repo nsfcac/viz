@@ -94,7 +94,7 @@ var simDurationinit = 0;
 var numberOfMinutes = 26*60;
 
 var iterationstep = 1;
-var maxstack =3;
+var maxstack =6;
 var normalTs =0.6; //time sampling
 // var timesteppixel = 0.1; // for 4
 var timesteppixel = 0.1; // for 26

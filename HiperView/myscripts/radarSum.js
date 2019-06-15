@@ -56,56 +56,60 @@ d3.radar = function () {
             decrementB:0,
         };
         // scag = scagnosticsnd(handledata(index), scagOptions);
-        scag = scagnosticsnd(dataSpider3.map(d=>{
-            var dd = d.map(k=>k.value);
-            dd.data = d.name;
-            return dd;}), scagOptions);
-        console.log('Outlying detect: bin='+scag.bins.length);
-        console.log(scag.outlyingPoints.map(d=>d.data));
-        console.log(scag.outlyingBins);
-        let outlyingPoints = [];
-        dataSpider3 = dataSpider3.filter(d=> {
-            let temp2 = scag.outlyingPoints.filter(e=>e.data===d.name);
-            let temp = JSON.parse(JSON.stringify(d));
-            if (temp2.length) {
-                let tempscaleval = [temp2[0]];
-                tempscaleval.val =temp2[0];
-                temp.indexSamp = d.indexSamp;
-                temp.name = d.name;
-                temp.bin ={val: [d.map(k=>k.value)],
-                    name:[temp2[0].data],
-                    scaledval: tempscaleval,
-                    distancefunc: (e)=>0,
-                    distance: 0};
-                outlyingPoints.push(temp);
-                temp.type = "outlying";
-                return 0;
-            }
-            return 1;
-        });
-        //TESTING ZONE
-        bin.data(dataSpider3.map(d=>{
-            var dd = d.map(k=>k.value);
-            dd.data = d.name;
-            return dd;}))
-            .calculate();
-        var keys = dataSpider3[0].map(d=>d.axis);
-        dataSpider3.length = 0;
-        console.log("numBins: "+bin.bins.length);
-        dataSpider3 = bin.bins.map(d=>
-        {   var temp = bin.normalizedFun.scaleBackPoint(d.val).map((e,i)=>{return {axis:keys[i],value:e}});
-            temp.bin ={val: bin.normalizedFun.scaleBackPoints(d),
-                name:d.map(f=>f.data),
-                scaledval: d,
-                distancefunc: (e)=>d3.max(e.map(function(p){return distance(e[0], p)})),
-                distance: d3.max(d.map(function(p){return distance(d.val, p)}))};
-            return temp;});
-        outlyingPoints.forEach(o=> dataSpider3.push(o));
-        console.log('current group + outlying: '+dataSpider3.length);
-        radarChartsumopt.levels = levelsR;
-        radarChartsumopt.color = color2;
-        radarChartsumopt.bin =true
-        RadarChart(".radar"+((index >= maxstack-1)?(maxstack-1):index), dataSpider3, radarChartsumopt,"");
+        // console.log(dataSpider3.map(d=>{
+        //     var dd = d.map(k=>k.value);
+        //     dd.data = d.name;
+        //     return dd;}))
+        // scag = scagnosticsnd(dataSpider3.map(d=>{
+        //     var dd = d.map(k=>k.value);
+        //     dd.data = d.name;
+        //     return dd;}), scagOptions);
+        // console.log('Outlying detect: bin='+scag.bins.length);
+        // console.log(scag.outlyingPoints.map(d=>d.data));
+        // console.log(scag.outlyingBins);
+        // let outlyingPoints = [];
+        // dataSpider3 = dataSpider3.filter(d=> {
+        //     let temp2 = scag.outlyingPoints.filter(e=>e.data===d.name);
+        //     let temp = JSON.parse(JSON.stringify(d));
+        //     if (temp2.length) {
+        //         let tempscaleval = [temp2[0]];
+        //         tempscaleval.val =temp2[0];
+        //         temp.indexSamp = d.indexSamp;
+        //         temp.name = d.name;
+        //         temp.bin ={val: [d.map(k=>k.value)],
+        //             name:[temp2[0].data],
+        //             scaledval: tempscaleval,
+        //             distancefunc: (e)=>0,
+        //             distance: 0};
+        //         outlyingPoints.push(temp);
+        //         temp.type = "outlying";
+        //         return 0;
+        //     }
+        //     return 1;
+        // });
+        // //TESTING ZONE
+        // bin.data(dataSpider3.map(d=>{
+        //     var dd = d.map(k=>k.value);
+        //     dd.data = d.name;
+        //     return dd;}))
+        //     .calculate();
+        // var keys = dataSpider3[0].map(d=>d.axis);
+        // dataSpider3.length = 0;
+        // console.log("numBins: "+bin.bins.length);
+        // dataSpider3 = bin.bins.map(d=>
+        // {   var temp = bin.normalizedFun.scaleBackPoint(d.val).map((e,i)=>{return {axis:keys[i],value:e}});
+        //     temp.bin ={val: bin.normalizedFun.scaleBackPoints(d),
+        //         name:d.map(f=>f.data),
+        //         scaledval: d,
+        //         distancefunc: (e)=>d3.max(e.map(function(p){return distance(e[0], p)})),
+        //         distance: d3.max(d.map(function(p){return distance(d.val, p)}))};
+        //     return temp;});
+        // outlyingPoints.forEach(o=> dataSpider3.push(o));
+        // console.log('current group + outlying: '+dataSpider3.length);
+        // radarChartsumopt.levels = levelsR;
+        // radarChartsumopt.color = color2;
+        // radarChartsumopt.bin =true
+        // RadarChart(".radar"+((index >= maxstack-1)?(maxstack-1):index), dataSpider3, radarChartsumopt,"");
         //d3.selectAll(".radarWrapper").filter(d=>d.name==="compute-3-41").moveToFront().select(".radarStroke").style("stroke",'red').style("stroke-width",2)
         bin.data([]);
         if (index >= maxstack-1) radarTimeline.shift();
@@ -264,7 +268,6 @@ d3.radar = function () {
             dataSpider3 = d3.merge([dataSpider3,datatemp]);
         dataSpider3.sort((a,b)=> a.name==="compute-3-41"?1:-1);
         dataSpider3.sort((a,b)=> a.name==="compute-3-41"?1:-1);
-        console.log(dataSpider3);
     }
 
     radarTimeline.data = function (_) {

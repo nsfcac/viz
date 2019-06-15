@@ -40,6 +40,10 @@ function RadarChart(id, data, options, name) {
     //Compute min max for the temperature
     var dif = (thresholds[0][1]-thresholds[0][0])/4;
     var right = thresholds[0][1]+dif; 
+    // var arrC = arrColor.map((d,i)=>d3.scaleSequential(d3.interpolateRdYlBu)
+    //     .domain([1, 0])(i/(arrColor.length-1)));
+    var arrC = arrColor.map((d,i)=>'black');
+    console.log(arrC);
 
     maxValue =right;
 
@@ -48,8 +52,7 @@ function RadarChart(id, data, options, name) {
                         thresholds[0][0]+3*dif, thresholds[0][1], maxValue];
     var colorTemperature = d3.scaleLinear()
                 .domain(arrThresholds)
-                .range(arrColor)
-                .interpolate(d3.interpolateHcl); //interpolateHsl interpolateHcl interpolateRgb
+                .range(arrC); //interpolateHsl interpolateHcl interpolateRgb
     var opaTemperature  = d3.scaleLinear()
                 .domain([left,thresholds[0][0],thresholds[0][0]+2*dif, thresholds[0][1], thresholds[0][1]+dif])
                 .range([0.3,0.2,0.1,0.2,0.3]);              
@@ -180,8 +183,8 @@ function RadarChart(id, data, options, name) {
                 var v = (maxValue - minValue) * d / cfg.levels + minValue;
                 return colorTemperature(v);
             })
-            .style("stroke-width", 0.3)
-            .style("stroke-opacity", 1)
+            .style("stroke-width", 0.01)
+            .style("stroke-opacity", 0.7)
             .style("fill-opacity", cfg.opacityCircles)
             .style("filter", "url(#glow)")
             .style("visibility", (d, i) => ((cfg.bin||!cfg.showText) && i == 0) ? "hidden" : "visible");
@@ -246,7 +249,7 @@ function RadarChart(id, data, options, name) {
     //The radial line function
     var radarLine = d3.radialLine()
        // .interpolate("linear-closed")
-       .curve(d3.curveCatmullRom.alpha(0.5))
+       .curve(d3.curveCatmullRom.alpha(0.8))
         .radius(function(d) { return rScale(d.value); })
         .angle(function(d,i) {  return angleSlice[i]; });
 
@@ -260,9 +263,9 @@ function RadarChart(id, data, options, name) {
         });
 
     if(cfg.roundStrokes) {
-        radarLine.curve(d3.curveCardinalClosed.tension(0));
+        radarLine.curve(d3.curveCardinalClosed.tension(0.5));
         //radialAreaGenerator.curve(d3.curveBasisClosed);
-        radialAreaGenerator.curve(d3.curveCardinalClosed.tension(0));
+        radialAreaGenerator.curve(d3.curveCardinalClosed.tension(0.5));
     }
                 
     //Create a wrapper for the blobs    

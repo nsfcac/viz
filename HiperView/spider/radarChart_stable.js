@@ -226,7 +226,7 @@ function RadarChart(id, data, options, name) {
     //The radial line function
     var radarLine = d3.radialLine()
        // .interpolate("linear-closed")
-       .curve(d3.curveCatmullRom.alpha(0.5))
+       .curve(d3.curveCatmullRom.alpha(1))
         .radius(function(d) { return rScale(d.value); })
         .angle(function(d,i) {  return angleSlice[i]; });
 
@@ -240,8 +240,8 @@ function RadarChart(id, data, options, name) {
         });
 
     if(cfg.roundStrokes) {
-        radarLine.curve(d3.curveCardinalClosed.tension(0));
-        radialAreaGenerator.curve(d3.curveCardinalClosed.tension(0));
+        radarLine.curve(d3.curveCardinalClosed.tension(1));
+        radialAreaGenerator.curve(d3.curveCardinalClosed.tension(1));
         //radarLine.interpolate("cardinal-closed");
     }
                 
