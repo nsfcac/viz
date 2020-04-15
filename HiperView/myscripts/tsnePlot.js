@@ -21,7 +21,7 @@ d3.Tsneplot = function () {
                 maxtries: 50
             }
     },
-        runopt,
+        runopt={},
         arr = [],tsne = undefined,intervalUI= undefined,
         isBusy = false;
         // tsne = new tsnejs.tSNE(graphicopt.opt);
@@ -40,6 +40,8 @@ d3.Tsneplot = function () {
     let groupMethod = 'outlier';
     let first = true;
     let returnEvent;
+    let schema;
+    let userl=[];
     function updateRenderRanking(data) {
         var max = d3.max(d3.extent(d3.merge(d3.extent(data,d=>d3.extent(d3.merge(d))))).map(d=>Math.abs(d)));
         scaleX_small.domain([-max,max]);
@@ -66,7 +68,7 @@ d3.Tsneplot = function () {
             .remove();
         // ENTER
         const newdiv = dataTop.enter().append("g")
-            .attr('class',d=> 'top10_item '+fixstr(d.name));
+            .attr('class',d=> 'top10_item '+fixName2Class(fixstr(d.name)));
         newdiv
             .attr('transform', 'translate(0,' + (maxlist + 0.5) * sizebox + ")")
             .style('opacity', 0)
@@ -167,13 +169,13 @@ d3.Tsneplot = function () {
             .on('mouseover',function(d){
                 const name = this.parentNode.parentNode.__data__.name;
                 svg.selectAll(".linkLineg").attr('opacity',0.05);
-                svg.select(".linkLineg."+fixstr(name)).attr('opacity',1).style("filter", "url(#glowTSne)")
+                svg.select(".linkLineg."+fixName2Class(fixstr(name))).attr('opacity',1).style("filter", "url(#glowTSne)")
                     .dispatch('mouseover');
                 // console.log(this.parentNode.parentNode.__data__.name)
             }).on('mouseleave',function(d){
                 const name = this.parentNode.parentNode.__data__.name;
                 svg.selectAll(".linkLineg").attr('opacity',1).style("filter", null);
-                svg.select(".linkLineg."+fixstr(name))
+                svg.select(".linkLineg."+fixName2Class(fixstr(name)))
                     .dispatch('mouseout');
                 // console.log(this.parentNode.parentNode.__data__.name)
             })
@@ -242,6 +244,10 @@ d3.Tsneplot = function () {
                     d3.select("#subzone").select('.community').text(n_community+1);
                     updateCluster (data.result);
                     break;
+                case 'clusterCircle':
+                    if (runopt.clusterProject==='dbscan')
+                        clusterlabel = data.result;
+                    break;
                 // case 'mean':
                 //     updateSummary(data.val);
                 //     break;
@@ -267,28 +273,29 @@ d3.Tsneplot = function () {
 
     Tsneplot.init = function(){
         // radar
-        var total = 10,                 //The number of different axes
-            angle1= Math.PI * 2 / total,
-            angle2= Math.PI * 2 / (total+4);
-        angleSlice = [];
-        for (var i=0;i<total;i++){
-            if (i==0 || i==1 || i==2)       // Temperatures
-                angleSlice.push(angle2*(i-1));
-            else if (i==5 || i==6 || i==7 || i==8)  // Fan speeds
-                angleSlice.push(Math.PI/4.62+angle2*(i-1));
-            else if (i==9)  // Power consumption
-                angleSlice.push(Math.PI * 1.5);
-            else
-                angleSlice.push(angle1*(i-1));
-        }      //TOMMY DANG
-        angleSlice[0] = Math.PI * 2 +angleSlice[0];
+        // var total = 10,                 //The number of different axes
+            // angle1= Math.PI * 2 / total,
+            // angle2= Math.PI * 2 / (total+4);
+        // angleSlice = schema.map(d=>d.angle).sort((a,b)=>a-b);
+        // for (var i=0;i<total;i++){
+        //     if (i==0 || i==1 || i==2)       // Temperatures
+        //         angleSlice.push(angle2*(i-1));
+        //     else if (i==5 || i==6 || i==7 || i==8)  // Fan speeds
+        //         angleSlice.push(Math.PI/4.62+angle2*(i-1));
+        //     else if (i==9)  // Power consumption
+        //         angleSlice.push(Math.PI * 1.5);
+        //     else
+        //         angleSlice.push(angle1*(i-1));
+        // }      //TOMMY DANG
+        // angleSlice[0] = Math.PI * 2 +angleSlice[0];
         var rScale = d3.scaleLinear()
             .range([0, graphicopt.dotRadius])
-            .domain([0, 1]);
+            .domain([-0.25, 1.25]);
         radarcreate = d3.radialLine()
             .curve(d3.curveCardinalClosed.tension(0))
-            .radius(function(d) { return rScale(d); })
-            .angle(function(d,i) {  return angleSlice[i]; });
+            .radius(function(d) { return rScale(d.value); })
+            .angle(function(d) {
+                return schema.find(s=>s.text===d.axis).angle; });
 
         trackercreate = d3.line()
             .x(d=> scaleX_small(d[0]))
@@ -308,29 +315,29 @@ d3.Tsneplot = function () {
             .append("rect")
             .attr("width", graphicopt.widthG())
             .attr("height", graphicopt.heightG());
-        const rg = svg.append("defs").append("radialGradient")
-            .attr("id", "rGradient");
-        const legntharrColor = arrColor.length-1;
-        rg.append("stop")
-            .attr("offset","0%")
-            .attr("stop-opacity", 0);
-        rg.append("stop")
-            .attr("offset", 3.5 / legntharrColor * 100 + "%")
-            .attr("stop-color", arrColor[4])
-            .attr("stop-opacity", 0);
-        arrColor.forEach((d,i)=>{
-            if (i>3) {
-                rg.append("stop")
-                    .attr("offset", (i+1) / legntharrColor * 100 + "%")
-                    .attr("stop-color", d)
-                    .attr("stop-opacity", (i+1) / legntharrColor);
-                // if (i != legntharrColor)
-                //     rg.append("stop")
-                //         .attr("offset", (i + 1) / legntharrColor * 100 + "%")
-                //         .attr("stop-color", arrColor[i + 1])
-                //         .attr("stop-opacity", i / legntharrColor);
-            }
-        });
+        // const rg = svg.append("defs").append("radialGradient")
+        //     .attr("id", "rGradient");
+        // const legntharrColor = arrColor.length-1;
+        // rg.append("stop")
+        //     .attr("offset","0%")
+        //     .attr("stop-opacity", 0);
+        // rg.append("stop")
+        //     .attr("offset", 3.5 / legntharrColor * 100 + "%")
+        //     .attr("stop-color", arrColor[4])
+        //     .attr("stop-opacity", 0);
+        // arrColor.forEach((d,i)=>{
+        //     if (i>3) {
+        //         rg.append("stop")
+        //             .attr("offset", (i+1) / legntharrColor * 100 + "%")
+        //             .attr("stop-color", d)
+        //             .attr("stop-opacity", (i+1) / legntharrColor);
+        //         // if (i != legntharrColor)
+        //         //     rg.append("stop")
+        //         //         .attr("offset", (i + 1) / legntharrColor * 100 + "%")
+        //         //         .attr("stop-color", arrColor[i + 1])
+        //         //         .attr("stop-opacity", i / legntharrColor);
+        //     }
+        // });
         glowEffect = svg.append('defs').append('filter').attr('id', 'glowTSne'),
             feGaussianBlur = glowEffect.append('feGaussianBlur').attr('stdDeviation', 2.5).attr('result', 'coloredBlur'),
             feMerge = glowEffect.append('feMerge'),
@@ -385,12 +392,29 @@ d3.Tsneplot = function () {
         // panel_user = d3.select("#userList").style('top',(graphicopt.offset.top-4)+'px');
         panel_user = d3.select("#userList");
         panel_user.select(".top10DIV").style('max-height', maxsubheight+"px");
-        list_user = Sortable.create($('tbody')[0], {
+        list_user = Sortable.create($('.top10DIV tbody')[0], {
             animation: 500,
             sort: false,
             dataIdAttr: 'data-id',
             filter: ".disable",
         });
+        list_user.sortVar = 'jobs';
+        list_user.direction = true;
+        let headerList = ['user','hosts','jobs'];
+        d3.selectAll('.top10DIV thead .sortHeader').each(function(d,i){
+           d3.select(this).on('click',()=>{
+               d3.selectAll('.top10DIV thead .sortHeader .dir').text('↕');
+               if (list_user.sortVar===headerList[i]){
+                   list_user.direction = !list_user.direction;
+               }else{
+                   list_user.sortVar = headerList[i];
+                   list_user.direction = true;
+               }
+               d3.select(this).select('.dir').text(list_user.direction?'▲':'▼');
+               user_sortBY()
+           });
+        });
+        d3.select('#timelineLabel').append('g');
         // search box event
         $('#search_User').on('input', searchHandler); // register for oninput
         $('#search_User').on('propertychange', searchHandler); // for IE8
@@ -408,6 +432,11 @@ d3.Tsneplot = function () {
             .scaleExtent([0.25, 100])
             //.translateExtent([[-netConfig.width/2,-netConfig.height/2], [netConfig.width*1.5,netConfig.height*1.5]])
             .on("zoom", zoomed);
+        try{
+            zoom.touchable(navigator.maxTouchPoints)
+        }catch(e){
+            console.log('Your device not support navigator.maxTouchPoints')
+        }
         svg.call(zoom);
 
         ss= graphicopt.scalezoom;
@@ -428,14 +457,15 @@ d3.Tsneplot = function () {
         forcetsne = d3.forceSimulation()
             .alphaDecay(0.005)
             .alpha(0.1)
-            .force('collide', d3.forceCollide().radius(graphicopt.dotRadius))
+            .force('collide', d3.forceCollide().radius(graphicopt.dotRadius).iterations(10))
             .on('tick', function () {
                 if (store.cost){
                     updateEmbedding(store.Y, store.cost);
                 }
             }).stop();
-
+        clusterg = g.append('g').attr('class','cluster-path-g');
     };
+    let clusterg;
     let forcetsne;
     let forcetsnemode = true;
     function updateCluster (data) {
@@ -470,11 +500,94 @@ d3.Tsneplot = function () {
                         (Y[i].x+tx) + "," +
                         (Y[i].y+ty) + ")"; });
         }
+        //---draw cluster
+
+        // convex
+        let clustpath;
+        if (runopt.clusterProject==='bin')
+            clusterlabel = clusterlabel_bin
+        switch (runopt.clusterDisplay) {
+            case 'convex':
+                clustpath = clusterlabel.map(d => {
+                    let temp = [d3.polygonHull(d.map(a => {
+                        const i = arr.findIndex(e => e.name === a);
+                        return [Y[i].x + tx, Y[i].y + ty];
+                    }))];
+                    if (temp[0]) {
+                        temp.name = d;
+                        return temp;
+                    }
+                }).filter(d => d);
+                break;
+            case 'alpha':
+            default:
+                hull = concaveHull().distance(200 * ss);
+                clustpath = clusterlabel.map(d => {
+                    let temp = hull(d.map(a => {
+                        const i = arr.findIndex(e => e.name === a);
+                        return [Y[i].x + tx, Y[i].y + ty];
+                    }));
+                    if (temp)
+                        temp.name = d;
+                    return temp;
+                }).filter(d => d.length);
+                break;
+        }
+        let c_arr = clusterg.selectAll('.clusterPath').data(clustpath,d=>d.name);
+        c_arr.exit().remove();
+        let c_p_arr = c_arr.enter().append('g').attr('class','clusterPath')
+            .merge(c_arr)
+            .styles({
+                fill: (d,i)=>colorCategory_cluster(i),
+                stroke: (d,i)=>colorCategory_cluster(i),
+                'stroke-width': graphicopt.dotRadius*2,
+            })
+            .on('mouseover',function(d){
+                d3.selectAll('.clusterPath').filter(e=>e!=d).style('opacity',0.05);
+                d3.selectAll('.radarStroke').filter(e=>e.bin&& (e.bin.name===d.name)).dispatch('mouseenter');
+            }).on('mouseleave',(d)=>{
+                d3.selectAll('.clusterPath').filter(e=>e!=d).style('opacity',0.2);
+                clearclone();})
+            .selectAll('path').data(d=>d);
+        c_p_arr.exit().remove();
+        c_p_arr = c_p_arr.enter()
+            .append('path')
+            .merge(c_p_arr);
+        if (skiptransition === true) {
+            c_p_arr
+                .interrupt()
+                .attr("d", d3.line().curve(d3.curveLinearClosed).x(d => d[0]).y(d => d[1])).style('fill','unset');
+        }else{
+            c_p_arr
+                // .transition().duration(runopt.simDuration * 1.1).ease(d3.easeLinear)
+                .attr("d", d3.line().curve(d3.curveLinearClosed).x(d => d[0]).y(d => d[1])).style('fill','unset');
+        }
+
+        //---end draw cluster
         //let curentHostpos = currenthost.node().getBoundingClientRect();
         linepointer.attr("x2", Math.max(Math.min(Y[currenthost.index].x+tx,graphicopt.widthG()),0) )
             .attr("y2", Math.max(Math.min(Y[currenthost.index].y+ty,graphicopt.heightG()),0)+ graphicopt.offset.top);
 
 
+    }
+    let clusterlabel_bin=[];
+    function updateClusterLabel (){
+        // console.log(cluster)
+        // let labelGroup = g.selectAll('.labelGroup').data(cluster);
+        // labelGroup.exit().remove();
+        // labelGroup.enter().append('circle').attr('class','labelGroup')
+        //     .merge(labelGroup)
+        //     .transition().duration(runopt.simDuration*1.1)
+        //     .ease(d3.easeLinear)
+        //     .attrs({
+        //         x: d=> d.x * runopt.zoom * ss+tx,
+        //         y: d=> d.y * runopt.zoom * ss+ty,
+        //         r: d=> d.radius * runopt.zoom *ss,
+        //     })
+        // clusterlabel
+        // d3.polygonHull
+        if (runopt.clusterProject=='bin')
+            clusterlabel_bin = clusterlabel;
     }
     let calTime = [0,0];
     let currenthost = {};
@@ -490,14 +603,14 @@ d3.Tsneplot = function () {
             forcetsne.alphaTarget(0.1);
             needUpdate = true;
             let newdata = g.selectAll(".linkLineg")
-                .data(arr,d=>d.name);
+                .data(handledata(arr),d=>d.name);
             newdata.select('clipPath').select('path')
                 .transition('expand').duration(100).ease(d3.easePolyInOut)
-                .attr("d", d => radarcreate(d));
+                .attr("d", d => radarcreate(d.filter(e=>e.enable)));
             newdata.select('.tSNEborder')
                 .transition('expand').duration(100).ease(d3.easePolyInOut)
-                .attr("d", d => radarcreate(d));
-
+                .attr("d", d => radarcreate(d.filter(e=>e.enable)));
+            // drawEmbedding(arr);
             currenthost.name = name;
             currenthost.g = g.selectAll(".linkLineg").filter((d,i)=>{
                 if (d.name===name){
@@ -539,6 +652,8 @@ d3.Tsneplot = function () {
             tsne.terminate();
         if(intervalUI)
             clearInterval(intervalUI);
+        if (forcetsne)
+            forcetsne.stop();
         // clearInterval(intervalCalculate);
     };
 
@@ -549,6 +664,7 @@ d3.Tsneplot = function () {
 
     Tsneplot.redraw  = function (){
         d3.select('#tsnezone').classed("active",true);
+        clusterlabel = [];
         panel.select('.top10').selectAll('*').remove();
         panel_user.select('.top10DIV tbody').selectAll('*').remove();
         panel_user.select('table').classed('empty',true);
@@ -576,9 +692,12 @@ d3.Tsneplot = function () {
             svg.style('visibility','hidden');
             Tsneplot.pause();
             g.selectAll('*').remove();
+            clusterg = g.append('g').attr('class','cluster-path-g');
+            clusterlabel = [];
         }
     };
-    let colorCategory = groupMethod==='outlier'?function(d){return d?'#8a001a':'gray'}:d3.scaleOrdinal(d3.schemeCategory10);
+    let colorCategory = groupMethod==='outlier'?function(d){return d?'#8a001a':'black'}:d3.scaleOrdinal(d3.schemeCategory10);
+    let colorCategory_cluster = d3.scaleOrdinal(d3.schemeCategory10);
     let colorScale =d3.scaleSequential(d3.interpolateSpectral);
     let meanArr=[];
     function distanace(a,b){
@@ -599,29 +718,34 @@ d3.Tsneplot = function () {
     }
 
 
-    function handledata(){
-
-        return arr;
+    function handledata(data){
+        let objectarr = data.map(a=>{
+            let temp = a.map((d,i)=>{return {axis: schema[i].text, value: d, enable: schema[i].enable};});
+            temp = _.sortBy(temp,d=>schema.find(e=>e.text===d.axis).angle);
+            temp.name = a.name;
+            return temp;
+        });
+        return objectarr;
     }
-    function user_sortBY (key,data){
-        switch (key) {
+    function user_sortBY (){
+        switch (list_user.sortVar) {
             case 'user':
-                data.sort((a,b)=>b.unqinode.length-a.unqinode.length);
-                data.sort((a,b)=>b.values.length-a.values.length);
-                data.sort((a,b)=>b.key-a.key);
+                userl.sort((a,b)=>(b.unqinode.length-a.unqinode.length)*(-1+2*list_user.direction));
+                userl.sort((a,b)=>(b.values.length-a.values.length)*(-1+2*list_user.direction));
+                userl.sort((a,b)=>a.key.localeCompare(b.key)*(-1+2*list_user.direction));
                 break;
             case 'jobs':
-                data.sort((a,b)=>b.key-a.key);
-                data.sort((a,b)=>b.unqinode.length-a.unqinode.length);
-                data.sort((a,b)=>b.values.length-a.values.length);
+                userl.sort((a,b)=>a.key.localeCompare(b.key)*(-1+2*list_user.direction));
+                userl.sort((a,b)=>(b.unqinode.length-a.unqinode.length)*(-1+2*list_user.direction));
+                userl.sort((a,b)=>(b.values.length-a.values.length)*(-1+2*list_user.direction));
                 break;
-            case 'nodes':
-                data.sort((a,b)=>b.key-a.key);
-                data.sort((a,b)=>b.values.length-a.values.length);
-                data.sort((a,b)=>b.unqinode.length-a.unqinode.length);
+            case 'hosts':
+                userl.sort((a,b)=>a.key.localeCompare(b.key)*(-1+2*list_user.direction));
+                userl.sort((a,b)=>(b.values.length-a.values.length)*(-1+2*list_user.direction));
+                userl.sort((a,b)=>(b.unqinode.length-a.unqinode.length)*(-1+2*list_user.direction));
                 break;
         }
-        list_user.sort(data.map(d=>d.key));
+        list_user.sort(userl.map(d=>d.key));
     }
     function searchHandler (e){
         if (e.target.value!=="") {
@@ -631,25 +755,28 @@ d3.Tsneplot = function () {
             panel_user.selectAll('tr.collection-item').classed('displayNone', false);
         }
     }
+
     function drawUserlist(currentTime) {
         currentTime =new Date(currentTime);
         $(userList_lastupdate).text('Last update: '+currentTime.timeNow2());
-        let userl = current_userData();
+        userl = current_userData();
         //ranking----
         panel_user.select('table').classed('empty',!userl.length);
         panel_user.select('.search-wrapper').classed('empty',!userl.length);
 
-        // userl.sort((a,b)=>b.values.length-a.values.length);
-        user_sortBY ('nodes',userl);
+        user_sortBY ();
 
         const totalUser = userl.length;
 
         const sh = 20;
-        const sw = 150;
+        const sw = 200;
         const tickh = 6;
         const margin = {top:tickh/2,bottom:tickh/2,left:1,right:1};
         // let rangestartTime = d3.extent(jobList,d=>new Date (d.startTime));
         let rangesubmitTime = d3.min(jobList,d=>new Date (d.submitTime));
+        let timelineMark = d3.select('#timelineLabel').style('padding-left','10px').style('overflow','visible').attrs({'height':14, 'width': sw+margin.left+margin.right})
+            .select('g').attr("transform", "translate("+margin.left+", 20)");
+
         let xscale = d3.scaleTime().range([0,sw]).domain([rangesubmitTime,currentTime]);
         const minstep = 7;
         let yscale = function (d,l) {
@@ -664,38 +791,38 @@ d3.Tsneplot = function () {
         let userli = panel_user.select('tbody')
             .selectAll('tr').data(userl,d=>d.key)
             .attr('data-id',d=>d.key)
-            .attr('class',d=>'collection-item '+ d.unqinode.join(' '));
+            .attr('class',d=>'collection-item '+ d.unqinode.map(fixName2Class).join(' '));
         //remove
         userli.exit().remove();
         //new
         let contain_n = userli.enter().append('tr')
-            .attr('class',d=>'collection-item '+ d.unqinode.join(' '))
+            .attr('class',d=>'collection-item '+ d.unqinode.map(fixName2Class).join(' '))
             .attr('data-id',d=>d.key)
             .on('mouseover',function(d){
                 const list_node = d.unqinode;
                 let filterhosttemp = _.intersection(filterhost,list_node);
-                d3.selectAll("." + _.difference(hosts.map(d=>d.name),filterhosttemp ).join(':not(tr), .')+':not(tr)')
+                d3.selectAll("." + _.difference(hosts.map(d=>d.name),filterhosttemp ).map(fixName2Class).join(':not(tr), .')+':not(tr)')
                     .classed("displayNone", true);
-                    d3.selectAll("." + filterhosttemp.join(', .'))
+                    d3.selectAll("." + filterhosttemp.map(fixName2Class).join(', .'))
                         .classed("displayNone", false);
             }).on('mouseleave',function(d){
                 $('#search_User')[0].value =""
-                d3.selectAll("." + _.difference(filterhost,d.unqinode ).join(':not(tr), .')+':not(tr)')
+                d3.selectAll("." + _.difference(filterhost,d.unqinode ).map(fixName2Class).join(':not(tr), .')+':not(tr)')
                     .classed("displayNone", true);
-                d3.selectAll("." + filterhost.join(', .'))
+                d3.selectAll("." + filterhost.map(fixName2Class).join(', .'))
                     .classed("displayNone", false);
             });
         contain_n.append('td')
             .attr('class','title')
             .text(d=>d.key);
         contain_n.append('td')
-            .attr('class','jobs alignRight')
-            .text(d=>d.values.length);
-        contain_n.append('td')
             .attr('class','nodes alignRight')
             .text(d=>d.unqinode.length);
-
         contain_n.append('td')
+            .attr('class','jobs alignRight')
+            .text(d=>d.values.length);
+
+        let newg = contain_n.append('td')
             .attr('class','user_timeline')
             .append('svg')
             .attrs({'height':sh+margin.top+margin.bottom,
@@ -703,6 +830,10 @@ d3.Tsneplot = function () {
             .append('g')
             .attr("transform", "translate("+margin.left+", "+margin.top+")");
 
+        newg.append('g').attr('class','gaxis').attr("transform", "translate(0, "+(-margin.top)+")");
+        timelineMark.call(d3.axisTop(xscale)
+            .ticks(d3.timeDay.every(1))
+            .tickFormat(d3.timeFormat("%d %b"))).selectAll('line, path').remove();
 
         //update
 
@@ -714,138 +845,196 @@ d3.Tsneplot = function () {
             .style('background-color',null);
         userli.select('.nodes') .text(d=>d.unqinode.length);
 
-        let mini_timeline = panel_user.selectAll('.user_timeline').select('g');
-
-        let timeBox = mini_timeline.selectAll('line.timeBox')
-            .data(d=>{
-                let temp =  d3.nest().key(k=>k.submitTime).entries(d.values);
-                // hard way handle all data
-                temp.sort((a,b)=>new Date(a.key)-new Date(b.key));
-                // yscaleItem[temp[0].user] = temp.length-1; //add length of data item
-                temp.forEach((t,i)=>
-                {   t.max_startTime =new Date(0);
-                    t.values.forEach(it=>{
-                        if (new Date(it.startTime)>t.max_startTime)
-                            t.max_startTime = new Date(it.startTime);
-                        it.y= yscale(i,(temp.length))});
+        minitimelinev2(300000);
+        function minitimelinev2(timelimit) {
+            let thickscale = d3.scaleSqrt().range([1,3]);
+            let thickdomain = [Infinity,1];
+            let mini_timeline = panel_user.selectAll('.user_timeline').select('g');
+            mini_timeline.select('.gaxis').call(d3.axisTop(xscale)
+                .ticks(d3.timeDay.every(1)).tickSize(-sh-margin.top-margin.bottom)
+                .tickFormat("")).select('.domain').remove();
+            mini_timeline.each(d=>{
+                const range_temp_sub = d3.extent(d.values,e=>+new Date(e.submitTime));
+                const range_temp_st = d3.extent(d.values,e=>+new Date(e.startTime));
+                const scale_temp_sub = d3.scaleLinear().domain([range_temp_sub[0],range_temp_sub[0]+timelimit]);
+                const scale_temp_st = d3.scaleLinear().domain([range_temp_st[0],range_temp_st[0]+timelimit]);
+                let temp = d3.nest().key(d =>''+Math.floor(scale_temp_sub(+new Date(d.submitTime)))+ Math.floor(scale_temp_st(+new Date(d.startTime)))).entries(d.values);
+                temp.forEach((t, i) => {
+                    t.startTime = d3.min(t.values,e=>new Date(e.startTime))
+                    t.submitTime = d3.min(t.values,e=>new Date(e.submitTime))
+                    t.y = yscale(i, (temp.length));
+                    t.num = t.values.length;
+                    if(t.num>thickdomain[1])
+                        thickdomain[1] = t.num;
+                    if(t.num<thickdomain[1])
+                        thickdomain[0] = t.num;
                 });
-                return temp;
+                d.group = temp;
+            })
+            thickscale.domain(thickdomain);
+            let timeBox = mini_timeline.selectAll('line.timeBox')
+                .data(d => d.group, e => e.submitTime);
+            timeBox.exit().remove();
+            timeBox
+                .enter()
+                .append('line')
+                .attr('class', 'timeBox')
+                .merge(timeBox)
+                .style('stroke-width',d=>thickscale(d.num))
+                .transition().duration(500)
+                .attr('x1', d => xscale(d.submitTime))
+                .attr('x2', d => xscale(d.startTime))
+                .attr('y1', (d, i) => d.y)
+                .attr('y2', (d, i) => d.y);
 
-                // easy way
-                // let temp = _(d.values).uniq(e=>e.submitTime);
-                // temp.sort((a,b)=>new Date(a.submitTime)-new Date(b.submitTime));
-                // // yscaleItem[temp[0].user] = temp.length-1; //add length of data item
-                // temp.forEach((t,i)=> t.y= yscale(i/(temp.length-1)));
-                // return temp;
-            },e=>e.key);
-        timeBox.exit().remove();
-        timeBox
-            .enter()
-            .append('line')
-            .attr('class','timeBox')
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(d.max_startTime))
-            .attr('y1',(d,i)=>d.values[0].y)
-            .attr('y2',(d,i)=>d.values[0].y);
-        // .attr('y1',(d,i)=>yscale(i/yscaleItem[d.user]))
-        //     .attr('y2',(d,i)=>yscale(i/yscaleItem[d.user]));
-        // .on('mousemove',function(d){
-        //     xFisheye.focus(d3.event.x);
-        //     panel_user.selectAll('line.startTime').attr('x',d=>xFisheye(new Date (d.submitTime)))
-        //         .attr('width',d=>xFisheye(new Date (d.startTime))-xFisheye(new Date (d.submitTime)));
-        //     panel_user.selectAll('line.startTime').attr('x1',d=>xFisheye(new Date (d.startTime)))
-        //         .attr('x2',d=>xFisheye(new Date (d.startTime)));
-        //     panel_user.selectAll('line.submitTime').attr('x1',d=>xFisheye(new Date (d.submitTime)))
-        //         .attr('x2',d=>xFisheye(new Date (d.submitTime)));
-        // });
-        timeBox.transition().duration(500)
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(d.max_startTime))
-            .attr('y1',(d,i)=>d.values[0].y)
-            .attr('y2',(d,i)=>d.values[0].y);
+            let timeBoxRunning = mini_timeline.selectAll('line.timeBoxRunning')
+                .data(d => d.group, d => d.startTime)
+            timeBoxRunning.exit().remove();
+            timeBoxRunning
+                .enter()
+                .append('line')
+                .attr('class', 'timeBoxRunning')
+                .merge(timeBoxRunning)
+                .style('stroke-width',d=>thickscale(d.num))
+                .transition().duration(500)
+                .attr('x1', d => xscale(d.startTime))
+                .attr('x2', d => xscale(currentTime))
+                .attr('y1', (d, i) => d.y)
+                .attr('y2', (d, i) => d.y);
+            //draw tick
 
-        let timeBoxRunning = mini_timeline.selectAll('line.timeBoxRunning')
-            .data(d=>{
-                let temp =  d3.nest().key(k=>k.startTime)
-                    .rollup((t,i)=>
-                    { return t[0];})
-                    .entries(d.values);
-                return temp;
-            },e=>e.key);
-        timeBoxRunning.exit().remove();
-        timeBoxRunning
-            .enter()
-            .append('line')
-            .attr('class','timeBoxRunning')
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(currentTime))
-            .attr('y1',(d,i)=>d.value.y)
-            .attr('y2',(d,i)=>d.value.y);
+            let linesubmitTime = mini_timeline.selectAll('line.submitTime')
+                .data(d => d.group, d => d.submitTime);
+            linesubmitTime.exit().remove();
+            linesubmitTime.enter()
+                .append('line')
+                .attr('class', 'submitTime')
+                .merge(linesubmitTime)
+                .transition().duration(500)
+                .attr('x1', d => xscale(d.submitTime))
+                .attr('x2', d => xscale(d.submitTime))
+                .attr('y1', -tickh / 2)
+                .attr('y2', tickh / 2)
+                .attr("transform", d => "translate(" + 0 + ", " + d.y + ")");
 
-        timeBoxRunning.transition().duration(500)
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(currentTime))
-            .attr('y1',(d,i)=>d.value.y)
-            .attr('y2',(d,i)=>d.value.y);
-        //draw tick
+            let linestartTime = mini_timeline.selectAll('line.startTime')
+                .data(d => d.group, d => d.startTime);
+            linestartTime.exit().remove();
+            linestartTime
+                .enter()
+                .append('line')
+                .attr('class', 'startTime')
+                .merge(linestartTime)
+                .transition().duration(500)
+                .attr('x1', d => xscale(d.startTime))
+                .attr('x2', d => xscale(d.startTime))
+                .attr('y1', -tickh / 2)
+                .attr('y2', tickh / 2)
+                .attr("transform", d => "translate(" + 0 + ", " + d.y + ")");
+        }
+        function minitimeline() {
+            let mini_timeline = panel_user.selectAll('.user_timeline').select('g');
+            mini_timeline.select('.gaxis').call(d3.axisTop(xscale)
+                .ticks(d3.timeDay.every(1)).tickSize(-sh-margin.top-margin.bottom)
+                .tickFormat("")).select('.domain').remove();
+            let timeBox = mini_timeline.selectAll('line.timeBox')
+                .data(d => {
+                    let temp = d3.nest().key(k => k.submitTime).entries(d.values);
+                    // hard way handle all data
+                    temp.sort((a, b) => new Date(a.key) - new Date(b.key));
+                    // yscaleItem[temp[0].user] = temp.length-1; //add length of data item
+                    temp.forEach((t, i) => {
+                        t.max_startTime = new Date(0);
+                        t.values.forEach(it => {
+                            if (new Date(it.startTime) > t.max_startTime)
+                                t.max_startTime = new Date(it.startTime);
+                            it.y = yscale(i, (temp.length))
+                        });
+                    });
+                    return temp;
+                }, e => e.key);
+            timeBox.exit().remove();
+            timeBox
+                .enter()
+                .append('line')
+                .attr('class', 'timeBox')
+                .merge(timeBox)
+                .transition().duration(500)
+                .attr('x1', d => xscale(new Date(d.key)))
+                .attr('x2', d => xscale(d.max_startTime))
+                .attr('y1', (d, i) => d.values[0].y)
+                .attr('y2', (d, i) => d.values[0].y);
 
-        let linesubmitTime = mini_timeline.selectAll('line.submitTime')
-        // .data(d=>_(d.values).uniq(e=>e.submitTime))
-            .data(d=> d3.nest().key(k=>k.submitTime).rollup(e=>d3.mean(e,ie=>ie.y)).entries(d.values),d=>d.key);
-        linesubmitTime.exit().remove();
-        linesubmitTime.enter()
-            .append('line')
-            .attr('class','submitTime')
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(new Date (d.key)))
-            .attr('y1',-tickh/2)
-            .attr('y2',tickh/2)
-            .attr("transform",d=>"translate("+0+", "+d.value+")");
-        linesubmitTime.transition().duration(500)
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(new Date (d.key)))
-            .attr("transform",d=>"translate("+0+", "+d.value+")");
+            let timeBoxRunning = mini_timeline.selectAll('line.timeBoxRunning')
+                .data(d => d3.nest().key(k => k.startTime).rollup(e => d3.mean(e, ie => ie.y)).entries(d.values), d => d.key)
+            timeBoxRunning.exit().remove();
+            timeBoxRunning
+                .enter()
+                .append('line')
+                .attr('class', 'timeBoxRunning')
+                .merge(timeBoxRunning)
+                .transition().duration(500)
+                .attr('x1', d => xscale(new Date(d.key)))
+                .attr('x2', d => xscale(currentTime))
+                .attr('y1', (d, i) => d.value)
+                .attr('y2', (d, i) => d.value);
+            //draw tick
 
-        let linestartTime = mini_timeline.selectAll('line.startTime')
-        // .data(d=>_(d.values).uniq(e=>e.startTime))
-            .data(d=>d3.nest().key(k=>k.startTime).rollup(e=>d3.mean(e,ie=>ie.y)).entries(d.values),d=>d.key);
-        linestartTime.exit().remove();
-        linestartTime
-            .enter()
-            .append('line')
-            .attr('class','startTime')
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(new Date (d.key)))
-            .attr('y1',-tickh/2)
-            .attr('y2',tickh/2)
-            .attr("transform",d=>"translate("+0+", "+d.value+")");
-        linestartTime.transition().duration(500)
-            .attr('x1',d=>xscale(new Date (d.key)))
-            .attr('x2',d=>xscale(new Date (d.key)))
-            .attr("transform",d=>"translate("+0+", "+d.value+")");
+            let linesubmitTime = mini_timeline.selectAll('line.submitTime')
+                .data(d => d3.nest().key(k => k.submitTime).rollup(e => d3.mean(e, ie => ie.y)).entries(d.values), d => d.key);
+            linesubmitTime.exit().remove();
+            linesubmitTime.enter()
+                .append('line')
+                .attr('class', 'submitTime')
+                .merge(linesubmitTime)
+                .transition().duration(500)
+                .attr('x1', d => xscale(new Date(d.key)))
+                .attr('x2', d => xscale(new Date(d.key)))
+                .attr('y1', -tickh / 2)
+                .attr('y2', tickh / 2)
+                .attr("transform", d => "translate(" + 0 + ", " + d.value + ")");
+
+            let linestartTime = mini_timeline.selectAll('line.startTime')
+                .data(d => d3.nest().key(k => k.startTime).rollup(e => d3.mean(e, ie => ie.y)).entries(d.values), d => d.key);
+            linestartTime.exit().remove();
+            linestartTime
+                .enter()
+                .append('line')
+                .attr('class', 'startTime')
+                .merge(linestartTime)
+                .transition().duration(500)
+                .attr('x1', d => xscale(new Date(d.key)))
+                .attr('x2', d => xscale(new Date(d.key)))
+                .attr('y1', -tickh / 2)
+                .attr('y2', tickh / 2)
+                .attr("transform", d => "translate(" + 0 + ", " + d.value + ")");
+        }
+
     }
 
     function drawEmbedding(data) {
 
         let datapoint = g.selectAll(".linkLineg")
-            .data(data);
+            .data(handledata(data));
         let datapointN = datapoint
             .enter().append("g")
-            .attr("class", d=>"linkLineg "+d.name)
+            .attr("class", d=>"compute linkLineg "+fixName2Class(d.name))
             .on('mouseover',function(d){
                 d3.select(this).select('text').style('opacity',1);
+                // mouseoverNode(d);
             }).on('mouseout',function(d){
                 d3.select(this).select('text').style('opacity',0);
-            });
+                // mouseoutNode(d);
+            }).on('click',function(d){ mouseoverNode(d);});
 
         datapointN.append("clipPath")
-            .attr("id",d=>"tSNE"+d.name)
+            .attr("id",d=>"tSNE"+fixName2Class(d.name))
             .append("path")
             .attr("d", d => radarcreate(d));
         datapointN
             .append("rect")
             .style('fill', 'url(#rGradient)')
-            .attr("clip-path", d=>"url(#tSNE"+d.name+")")
+            .attr("clip-path", d=>"url(#tSNE"+fixName2Class(d.name)+")")
             .attr("x",-graphicopt.dotRadius)
             .attr("y",-graphicopt.dotRadius)
             .attr("width",graphicopt.dotRadius*2)
@@ -870,14 +1059,57 @@ d3.Tsneplot = function () {
         // TODO: need fix here
         g.selectAll(".linkLineg").selectAll('text')
             .text(function(d,i) {return d.name.replace("compute-","") })
+        // let datapoint = g.selectAll(".linkLineg")
+        //     .data(handledata(data));
+        // datapoint.exit().remove();
+        // let datapointN = datapoint
+        //     .enter().append("g");
+        //
+        // datapointN.append("text")
+        //     .attr("text-anchor", "top")
+        //     .attr("transform", "translate(5, -5)")
+        //     .attr("font-size", 12)
+        //     .style('opacity',0);
+        //
+        // datapointN.merge(datapoint) .selectAll('text')
+        //     .text(function(d,i) {return d.name.replace("compute-","") });
+        //
+        // datapointN.merge(datapoint)
+        //     .attr("class", d=>"compute linkLineg "+fixName2Class(d.name))
+        //     .on('mouseover',function(d){
+        //         d3.select(this).select('text').style('opacity',1);
+        //         mouseoverNode(d);
+        //     }).on('mouseout',function(d){
+        //         d3.select(this).select('text').style('opacity',0);
+        //         mouseoutNode(d);
+        //     })
+        //     .call(c=>
+        //         c.each(function(d){
+        //             return RadarChart(".compute.linkLineg."+fixName2Class(d.name),[d],graphicopt.radaropt)}));
+
 
     }
+    function updateSingledataEmbedding (){
+        let newdata = g.selectAll(".linkLineg")
+            .data(handledata(arr),d=>d[0].name);
+        newdata.select('clipPath').select('path')
+            .transition('expand').duration(100).ease(d3.easePolyInOut)
+            .attr("d", d => radarcreate(d.filter(e=>e.enable)));
+        newdata.select('.tSNEborder')
+            .transition('expand').duration(100).ease(d3.easePolyInOut)
+            .attr("d", d => radarcreate(d.filter(e=>e.enable)));
+    }
+
     function fixstr(s) {
         return s.replace(/ |#/gi,'');
     }
+    let clusterlabel=[];
+    Tsneplot.clusterBin = function (_) {
+        return arguments.length ? (((runopt.clusterProject==='bin') ? clusterlabel = _:_),updateClusterLabel(), Tsneplot) : clusterlabel;
+    };
+
     Tsneplot.data = function (_) {
         return arguments.length ? (arr = _, Tsneplot) : arr;
-
     };
 
     Tsneplot.reset = function (_) {
@@ -894,11 +1126,48 @@ d3.Tsneplot = function () {
         return arguments.length ? (linepointer = _, Tsneplot) : linepointer;
 
     };
-    Tsneplot.runopt = function (_) {
-        return arguments.length ? (runopt = _, Tsneplot) : runopt;
+    Tsneplot.RadarColor = function (_) {
+        return arguments.length ? (arrColor = _.arrColor,UpdateGradient(svg), Tsneplot) : arrColor;
     };
-    Tsneplot.graphicopt = function (_) {return arguments.length ? (graphicopt = _, Tsneplot) : graphicopt;};
+
+    Tsneplot.runopt = function (_) {
+        //Put all of the options into a variable called runopt
+        if (arguments.length) {
+            for (let i in _) {
+                if ('undefined' !== typeof _[i]) {
+                    runopt[i] = _[i];
+                }
+            }
+            return Tsneplot;
+        }else {
+            return runopt;
+        }
+
+    };
+    Tsneplot.graphicopt = function (_) {
+        //Put all of the options into a variable called graphicopt
+        if (arguments.length) {
+            for (let i in _) {
+                if ('undefined' !== typeof _[i]) {
+                    graphicopt[i] = _[i];
+                }
+            }
+            if (graphicopt.radaropt)
+                graphicopt.radaropt.schema = schema
+            return Tsneplot;
+        }else {
+            return graphicopt;
+        }
+
+    };
+    radarController.div = function (_) {
+        return arguments.length ? (div = _, radarController) : div;
+
+    };
     Tsneplot.drawUserlist = function (_) {drawUserlist(_)};
+    Tsneplot.schema = function (_) {
+        return arguments.length ? (graphicopt.radaropt.schema = _,schema = _, Tsneplot) : schema;
+    };
     Tsneplot.dispatch = function (_) {
         return arguments.length ? (returnEvent = _, Tsneplot) : returnEvent;
     };

@@ -1,7 +1,20 @@
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/iDataVisualizationLab/HPCC/master/LICENSE)
+# 2020
+
+TimeRadar Current: https://idatavisualizationlab.github.io/HPCC/TimeRadar
+
+TimeRadar release 0220: https://idatavisualizationlab.github.io/HPCC/TimeRadar20200219
+
+![ScreenShot](https://github.com/iDataVisualizationLab/HPCC/blob/master/HiperView/Images_cases/TimeRadar.PNG)
 
 # 2019
 
-HiperView :  https://idatavisualizationlab.github.io/HPCC/HiperView/demo.html
+HiperView Current:  https://idatavisualizationlab.github.io/HPCC/HiperView/demo.html
+
+HiperView release 0919: https://idatavisualizationlab.github.io/HPCC/HiperView20190914/demo.html
+
+HiperView release 0619: https://idatavisualizationlab.github.io/HPCC/HiperView20190531/demo.html
+
 ![ScreenShot](https://github.com/iDataVisualizationLab/HPCC/blob/master/HiperView/Images_cases/HiperView.png)
 
 Phase Space: https://idatavisualizationlab.github.io/HPCC/PhaseSpace/index.html
@@ -12,6 +25,15 @@ Vitural Reality: https://idatavisualizationlab.github.io/HPCC/HiperView/HPCC_VR/
 
 Parallel Coordinate: https://idatavisualizationlab.github.io/HPCC/ParallelCoordinates/index.html
 ![ScreenShot](https://github.com/iDataVisualizationLab/HPCC/blob/master/HiperView/Images_cases/ParrallelCoordinate.png)
+
+ClusteringView: https://idatavisualizationlab.github.io/HPCC/clusterDemo/index.html
+![ScreenShot](https://github.com/iDataVisualizationLab/HPCC/blob/master/HiperView/Images_cases/ClusterView.PNG)
+
+
+HiperJobViz release 1119: https://idatavisualizationlab.github.io/HPCC/HiperJobViz20191126/index.html
+
+![ScreenShot](https://github.com/iDataVisualizationLab/HPCC/blob/master/HiperView/Images_cases/JobNet.PNG)
+[Presentation SC19 - DAAC 2019](https://texastechuniversity-my.sharepoint.com/:p:/g/personal/tommy_dang_ttu_edu/EewObo2LMz5Gt1tLBTg1wFYBoMGrvVZ3wLZIRqVGY_50EA?e=z4wmyn)
 
 # 2018
 
@@ -37,4 +59,5 @@ September 26, 2018:
 
 ### job_scheduling: https://idatavisualizationlab.github.io/HPCC/job_scheduling/
 ![ScreenShot](https://github.com/iDataVisualizationLab/HPCC/blob/master/job_scheduling/images/users.png)
+
 

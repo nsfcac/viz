@@ -1,9 +1,12 @@
+window =self;
 importScripts("../../js/d3.v4.js");
 importScripts("../../js/tsne.js");
 importScripts("../../js/underscore-min.js");
 importScripts("https://unpkg.com/simple-statistics@2.2.0/dist/simple-statistics.min.js");
 importScripts("../../js/jLouvain.js");
-importScripts("../../js/scagnosticsnd.min.js");
+// importScripts("../../js/scagnosticsnd.min.js");
+importScripts("../../../HiperView20190914/js/scagnosticsnd.min.js");
+importScripts("../../js/jDBSCAN.js");
 let tsne,sol,
     stepnumber = 5,
     countstack =0,
@@ -16,6 +19,7 @@ let tsne,sol,
     hostname,
     stopCondition =1e-4,
     community = jLouvain(),
+    dbscan = jDBSCAN(),
     groups,
     groupmethod = "outlier",
     currentMaxIndex =-1,
@@ -40,6 +44,7 @@ addEventListener('message',function ({data}){
                 maxstack = (data.value);
                 break;
             case "initDataRaw":
+                console.log('initDataRaw')
                 countstack = 0;
                 tsne.initDataRaw(data.value);
                 if (data.index===undefined) {
@@ -108,6 +113,7 @@ addEventListener('message',function ({data}){
                     // community.edges(convertLink(tsne.getProbability(), hostname));
                     // var result = community();
                     var result = findGroups(data.value,'outlier')
+                    postMessage({action: 'clusterCircle', result: getdbscan()});
                     groups = result;
                     // postMessage({action: 'cluster', result: result});
                     //---------------
@@ -161,6 +167,7 @@ addEventListener('message',function ({data}){
                     if (countstack>stack) {
                         countstack =0;
                     }
+                    // postMessage({action: 'clusterCircle', result: getdbscan()});
                     stepstable(cost, tsne.getSolution(), groups,"done");
                     // postMessage({action:'stable', status:"done"});
                     // postMessage({action: 'step', result: {cost: cost, solution: sol}, status:"done"});
@@ -293,3 +300,37 @@ function getComunity (){
     community.nodes(hostname).edges(convertLink(tsne.getProbability(),hostname));
     return community();
 }
+
+function getdbscan () {
+    let solution = tsne.getSolution();
+    dbscan.eps(0.075).minPts(1).distance('EUCLIDEAN').data(convertPosition(tsne.getSolution(),hostname));
+    dbscan();
+    return dbscan_cluster2data(dbscan.getClusters(),solution,hostname);
+
+}
+let scalev = d3.scaleLinear();
+function convertPosition (array,ids) {
+    const N = ids.length;
+    scalev .domain(d3.extent(_.flatten(array)));
+    let points =[];
+    for (let i = 0; i < N; i++)
+        points.push({x: scalev(array[i][0]), y:scalev(array[i][1])});
+    return points;
+}
+function dbscan_cluster2data (clusters,data,ids) {
+    // clusters.forEach(d=>{
+    //     d.x = scalev.invert(d.x);
+    //     d.y = scalev.invert(d.y);
+    //     var distances = d.parts.map(function(p){return distance([d.x, d.y], data[p])});
+    //     d.radius = d3.max(distances);
+    //     d.members = d.parts.map(e=>ids[e])
+    // })
+    return clusters.map(d=>d.parts.map(e=>ids[e]));
+}
+
+// function distance(a, b){
+//     console.log(a,b)
+//     var dx = a[0] - b[0],
+//         dy = a[1] - b[1];
+//     return Math.sqrt((dx * dx) + (dy * dy));
+// }

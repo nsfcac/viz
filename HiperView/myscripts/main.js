@@ -1,14 +1,29 @@
-/* June-2018
- * Tommy Dang (on the HPCC project, as Assistant professor, iDVL@TTU)
+/* MIT License
  *
- * THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
- * WARRANTY.  IN PARTICULAR, THE AUTHORS MAKE NO REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
- * OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
+ * Copyright (c) 2019 Tommy Dang, Ngan V.T. Nguyen
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ *     The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 
 // Set the dimensions of the canvas / graph
-var margin = {top: 5, right: 0, bottom: 50, left: 0};
+var margin = {top: 5, right: 0, bottom: 10, left: 0};
 
 var svg = d3.select(".mainsvg"),
     width = +document.getElementById("mainBody").offsetWidth,
@@ -22,6 +37,16 @@ svg = svg
     .append("g")
     .attr("transform",
         "translate(" + margin.left + "," + margin.top + ")");
+// other component setting
+// summaryGroup
+let summaryGroup_op ={
+    margin : {top: 5, right: 0, bottom: 0, left: 0},
+    height: 280,
+}
+let Radarplot_opt = {
+    clusterMethod: 'leaderbin',
+}
+
 var svgStore={};
 var svgsum;
 //.call(d3.zoom()
@@ -77,8 +102,8 @@ var h_rack = 580;//980;
 var w_rack = (width-23)/10-1;
 var w_gap =0;
 var node_size = 6;
-var sHeight=280;  // Summary panel height
-var top_margin = sHeight+46;  // Start rack spiatial layout
+
+var top_margin = summaryGroup_op.height+summaryGroup_op.margin.top+31;  // Start rack spiatial layout
 
 
 var users = [];
@@ -102,8 +127,8 @@ var timesteppixel = 0.1; // for 26
 var isRealtime = false;
 var db = 'nagios';
 if (isRealtime){
-    simDuration = 1000;
-    simDurationinit = 1000;
+    simDuration = 200;
+    simDurationinit = 200;
     numberOfMinutes = 26*60;
 }
 
@@ -129,12 +154,53 @@ let globalTrend = false;
 var initialService = "Temperature";
 var selectedService;
 
+let colorScaleList = {
+    n: 7,
+    rainbow: ["#000066", "#4400ff", "#00ddff", "#00ddaa", "#00dd00", "#aadd00", "#ffcc00", "#ff8800", "#ff0000", "#660000"],
+    soil: ["#2244AA","#4A8FC2", "#76A5B1", "#9DBCA2", "#C3D392", "#F8E571", "#F2B659", "#eb6424", "#D63128", "#660000"],
+    customFunc: function(name,arr,num){
+        const n= num||this.n;
+        const arrColor = arr||this[name];
+        let colorLength = arrColor.length;
+        const arrThresholds=d3.range(0,colorLength).map(e=>e/(colorLength-1));
+        let colorTemperature = d3.scaleLinear()
+            .domain(arrThresholds)
+            .range(arrColor)
+            .interpolate(d3.interpolateHcl);
+
+        return d3.range(0,n).map(e=>colorTemperature(e/(n-1)))
+    },
+    d3colorChosefunc: function(name,num){
+        const n = num|| this.n;
+        if (d3[`scheme${name}`]) {
+            if (typeof (d3[`scheme${name}`][0]) != 'string') {
+                colors = (d3[`scheme${name}`][n]||d3[`scheme${name}`][d3[`scheme${name}`].length-1]).slice();
+            }
+            else
+                colors=  d3[`scheme${name}`].slice();
+        } else {
+            const interpolate = d3[`interpolate${name}`];
+            colors = [];
+            for (let i = 0; i < n; ++i) {
+                colors.push(d3.rgb(interpolate(i / (n - 1))).hex());
+            }
+        }
+        colors = this.customFunc(undefined,colors,n);
+        return colors;
+    },
+},colorArr = {Radar: [
+        {val: 'rainbow',type:'custom',label: 'Rainbow'},
+        {val: 'RdBu',type:'d3',label: 'Blue2Red',invert:true},
+        {val: 'soil',type:'custom',label: 'RedYelBlu'},],
+    Cluster: [{val: 'Category10',type:'d3',label: 'D3'},{val: 'Paired',type:'d3',label: 'Blue2Red'}]};
 
 var arrThresholds;
 var dif, mid,left;
 var color,opa;
 //var arrColor = ['#00c', '#1a9850','#fee08b', '#d73027'];
-var arrColor = ['#110066','#4400ff', '#00cccc', '#00dd00','#ffcc44', '#ff0000', '#660000'];
+// var arrColor = ['#110066','#4400ff', '#00cccc', '#00dd00','#ffcc44', '#ff0000', '#660000'];
+let arrColor = colorScaleList.customFunc('rainbow');
+
 setColorsAndThresholds(initialService);
 
 //********tooltip***************
@@ -177,6 +243,16 @@ var TsnePlotopt  = {
             radius: 30,
         }
     },
+    radaropt : {
+        // summary:{quantile:true},
+        mini:true,
+        levels:6,
+        gradient:true,
+        w:30,
+        h:30,
+        showText:false,
+        margin: {top: 0, right: 0, bottom: 0, left: 0},
+    },
     top10:{
         details :{
             circle: {
@@ -206,58 +282,65 @@ var TsnePlotopt  = {
     runopt:{
         zoom:30,
         simDuration: 1000,
+        clusterDisplay: 'alpha',
+        clusterProject: 'bin',
+        displayMode: 'tsne',
+
     }
 };
 var Scatterplot = d3.Scatterplot();
 var Radarplot = d3.radar();
 var TSneplot = d3.Tsneplot().graphicopt(TsnePlotopt).runopt(TsnePlotopt.runopt);
+var MetricController = radarController();
 let getDataWorker = new Worker ('myscripts/worker/getDataWorker.js');
 let isbusy = false, imageRequest = false;
 
 function setColorsAndThresholds(s) {
     for (var i=0; i<serviceList_selected.length;i++){
-        if (s == serviceList[i] && i==1){  // CPU_load
-            dif = (thresholds[i][1]-thresholds[i][0])/4;
-            mid = thresholds[i][0]+(thresholds[i][1]-thresholds[i][0])/2;
+        let range = serviceLists[serviceList_selected[i].index].sub[0].range;
+        if (s == serviceList_selected[i].text && serviceList_selected[i].text==='Job_load'){  // CPU_load
+            dif = (range[1]-range[0])/4;
+            mid = range[0]+(range[1]-range[0])/2;
             left=0;
-            arrThresholds = [left,thresholds[i][0], 0, thresholds[i][0]+2*dif, 10, thresholds[i][1], thresholds[i][1]];
+            arrThresholds = [left,range[0], 0, range[0]+2*dif, 10, range[1], range[1]];
             color = d3.scaleLinear()
                 .domain(arrThresholds)
                 .range(arrColor)
                 .interpolate(d3.interpolateHcl); //interpolateHsl interpolateHcl interpolateRgb
             opa = d3.scaleLinear()
-                .domain([left,thresholds[i][0],thresholds[i][0]+dif, thresholds[i][0]+2*dif, thresholds[i][0]+3*dif, thresholds[i][1], thresholds[i][1]+dif])
+                .domain([left,range[0],range[0]+dif, range[0]+2*dif, range[0]+3*dif, range[1], range[1]+dif])
                 .range([1,1,0.3,0.06,0.3,1,1]);
 
         }
-        else if (s == serviceList[i] && i==2){  // Memory_usage
-            dif = (thresholds[i][1]-thresholds[i][0])/4;
-            mid = thresholds[i][0]+(thresholds[i][1]-thresholds[i][0])/2;
+        else if (s == serviceList_selected[i].text && serviceList_selected[i].text==='Memory_usage'){  // Memory_usage
+            dif = (range[1]-range[0])/4;
+            mid = range[0]+(range[1]-range[0])/2;
             left=0;
-            arrThresholds = [left,thresholds[i][0], 0, thresholds[i][0]+2*dif, 98, thresholds[i][1], thresholds[i][1]];
+            arrThresholds = [left,range[0], 0, range[0]+2*dif, 98, range[1], range[1]];
             color = d3.scaleLinear()
                 .domain(arrThresholds)
                 .range(arrColor)
                 .interpolate(d3.interpolateHcl); //interpolateHsl interpolateHcl interpolateRgb
             opa = d3.scaleLinear()
-                .domain([left,thresholds[i][0],thresholds[i][0]+dif, thresholds[i][0]+2*dif, thresholds[i][0]+3*dif, thresholds[i][1], thresholds[i][1]+dif])
+                .domain([left,range[0],range[0]+dif, range[0]+2*dif, range[0]+3*dif, range[1], range[1]+dif])
                 .range([1,1,0.3,0.06,0.3,1,1]);
 
         }
-        else if (s == serviceList[i]){
-            dif = (thresholds[i][1]-thresholds[i][0])/4;
-            mid = thresholds[i][0]+(thresholds[i][1]-thresholds[i][0])/2;
-            left = thresholds[i][0]-dif;
+        else if (s == serviceList_selected[i].text){
+            dif = (range[1]-range[0])/4;
+            mid = range[0]+(range[1]-range[0])/2;
+            left = range[0]-dif;
             if (left<0 && i!=0) // Temperature can be less than 0
                 left=0;
-            arrThresholds = [left,thresholds[i][0], thresholds[i][0]+dif, thresholds[i][0]+2*dif, thresholds[i][0]+3*dif, thresholds[i][1], thresholds[i][1]+dif];
+            arrThresholds = [left,range[0], range[0]+dif, range[0]+2*dif, range[0]+3*dif, range[1], range[1]+dif];
             color = d3.scaleLinear()
                 .domain(arrThresholds)
                 .range(arrColor)
                 .interpolate(d3.interpolateHcl); //interpolateHsl interpolateHcl interpolateRgb
             opa = d3.scaleLinear()
-                .domain([left,thresholds[i][0],thresholds[i][0]+dif, thresholds[i][0]+2*dif, thresholds[i][0]+3*dif, thresholds[i][1], thresholds[i][1]+dif])
+                .domain([left,range[0],range[0]+dif, range[0]+2*dif, range[0]+3*dif, range[1], range[1]+dif])
                 .range([1,1,0.3,0.06,0.3,1,1]);
+            break;
         }
     }
 }
@@ -596,7 +679,7 @@ function drawHorizontalView() {
 
     // Summary Panel ********************************************************************
     var maingradient = svg.append("defs").append("linearGradient")
-        .attr("id", "mainColor")
+        .attr("id", "lradient")
         .attr('x1', '0%')
         .attr('y1', '100%')
         .attr('x2', '0%')
@@ -609,13 +692,13 @@ function drawHorizontalView() {
 
     svgsum = svg.append("g")
         .attr("class", "summaryGroup")
-        .attr("transform", "translate(" + 1 + "," + 15 + ")");
+        .attr("transform", "translate(" + summaryGroup_op.margin.left + "," + summaryGroup_op.margin.top + ")");
     svgsum.append("rect")
         .attr("class", "summaryRect")
         .attr("rx", 10)
         .attr("ry", 10)
         .attr("width", width - 2)
-        .attr("height", sHeight)
+        .attr("height", summaryGroup_op.height)
         .attr("fill", "#fff")
         .attr("stroke", "#000")
         .attr("stroke-width", 1)
@@ -623,20 +706,20 @@ function drawHorizontalView() {
     svgsum.append('svg')
         .attr("class", "summarySvg")
         .attr("width", width - 2)
-        .attr("height", sHeight);
+        .attr("height", summaryGroup_op.height);
     d3.select(".summaryText1")
         .html("Quanah HPC system: <b>" + hosts.length + "</b> hosts distributed in 10 racks");
 
 
     var currentTextGroup = svg.append('g')
         .attr("class", "currentTextGroup")
-        .attr('transform', 'translate(' + 10 + ',' + (sHeight - 36) + ')');
+        .attr('transform', 'translate(' + 10 + ',' + (summaryGroup_op.height - 36-10) + ')');
     svgsum.append("line")
         .attr("class", "currentTimeline")
         .attr("x1", 10)
         .attr("y1", 0)
         .attr("x2", 10)
-        .attr("y2", sHeight)
+        .attr("y2", summaryGroup_op.height)
         .attr("stroke", "#000")
         .attr("stroke-width", 1)
         .style("stroke-dasharray", ("2, 2"));
@@ -679,7 +762,7 @@ function drawHorizontalView() {
     let linepointer = svg.append("line")
         .attr("class", "connectTimeline")
         .attr("x1", 10)
-        .attr("y1", sHeight + 15)
+        .attr("y1", summaryGroup_op.height + summaryGroup_op.margin.top)
         .attr("x2", 10)
         .attr("y2", 310)
         .attr("stroke", "#000")
@@ -689,10 +772,10 @@ function drawHorizontalView() {
     xLinearSummaryScale = d3.scaleAdjust().range([0 - radarsize / 24, width + radarsize / 24]).domain([0, maxstack - 1]).itemsize(radarsize);
     //xLinearSummaryScale = d3.scaleAdjust().range([0,width]).domain([0, maxstack-1]).itemsize(radarsize);
     xTimeSummaryScale = xLinearSummaryScale;
-    Radarplot.svg(svgsum.select(".summarySvg")).BinRange([4, 10]).scale(xLinearSummaryScale)
-        .maxstack(maxstack);
-
-    TSneplot.svg(svgStore.tsnesvg).linepointer(linepointer).init();
+    Radarplot.svg(svgsum.select(".summarySvg")).BinRange([4, 10]).scale(xLinearSummaryScale).binopt(Radarplot_opt)
+        .maxstack(maxstack).schema(serviceFullList);
+    radarChartOptions.angleSlice = serviceFullList.map(d=>d.angle);
+    TSneplot.svg(svgStore.tsnesvg).linepointer(linepointer).schema(serviceFullList).init();
 }
 function drawVerticalView() {
 
@@ -727,77 +810,13 @@ function drawVerticalView() {
 
     }
     // Summary Panel ********************************************************************
-    var maingradient = svg.append("defs").append("linearGradient")
-        .attr("id", "mainColor")
-        .attr('x1', '0%')
-        .attr('y1', '100%')
-        .attr('x2', '0%')
-        .attr('y2', '0%');
-    maingradient.selectAll('stop').data(arrColor)
-        .enter().append('stop')
-        .attr('offset', (d, i) => (i - 1) / 4)
-        .style('stop-color', d => d)
-        .style('stop-opacity', (d, i) => opa.range()[i]);
+
 
     d3.select(".summaryText1")
         .html("Quanah HPC system: <b>" + hosts.length + "</b> hosts distributed in 10 racks");
 
-    //
-    // var currentTextGroup = svg.append('g')
-    //     .attr("class", "currentTextGroup")
-    //     .attr('transform', 'translate(' + 10 + ',' + (sHeight - 36) + ')');
-    // svgsum.append("line")
-    //     .attr("class", "currentTimeline")
-    //     .attr("x1", 10)
-    //     .attr("y1", 0)
-    //     .attr("x2", 10)
-    //     .attr("y2", sHeight)
-    //     .attr("stroke", "#000")
-    //     .attr("stroke-width", 1)
-    //     .style("stroke-dasharray", ("2, 2"));
-    // currentTextGroup.append("text")
-    //     .attr("class", "currentText")
-    //     .attr("y", 0)
-    //     .attr("fill", "#000")
-    //     .style("text-anchor", "start")
-    //     .style("font-size", "12px")
-    //     .style("text-shadow", "1px 1px 0 rgba(255, 255, 255")
-    //     .attr("font-family", "sans-serif")
-    //     .text("Latest REQUEST");
-    // currentTextGroup.append("text")
-    //     .attr("class", "currentHostText")
-    //     .attr("y", 18)
-    //     .attr("fill", "#000")
-    //     .style("text-anchor", "start")
-    //     .style("font-weight", "bold")
-    //     .style("font-size", "12px")
-    //     .style("text-shadow", "1px 1px 0 rgba(255, 255, 255")
-    //     .attr("font-family", "sans-serif")
-    //     .text("Host");
-    // currentTextGroup.append("text")
-    //     .attr("class", "currentTimeText")
-    //     .attr("y", 36)
-    //     .attr("fill", "#000")
-    //     .style("text-anchor", "start")
-    //     .style("font-style", "italic")
-    //     .style("font-size", "12px")
-    //     .style("text-shadow", "1px 1px 0 rgba(255, 255, 255")
-    //     .attr("font-family", "sans-serif")
-    //     .text("Time");
-
-
     initVerticalView();
 
-    // Draw line to connect current host and timeline in the Summary panel
-    // let linepointer = svg.append("line")
-    //     .attr("class", "connectTimeline")
-    //     .attr("x1", 10)
-    //     .attr("y1", sHeight + 15)
-    //     .attr("x2", 10)
-    //     .attr("y2", 310)
-    //     .attr("stroke", "#000")
-    //     .attr("stroke-width", 1)
-    //     .style("stroke-dasharray", ("2, 2"));
     // ********* REQUEST ******************************************
     xLinearSummaryScale = d3.scaleAdjust().range([0 - radarsize / 24, width + radarsize / 24]).domain([0, maxstack - 1]).itemsize(radarsize);
     //xLinearSummaryScale = d3.scaleAdjust().range([0,width]).domain([0, maxstack-1]).itemsize(radarsize);
@@ -823,28 +842,20 @@ function changeView(v){
         pausechange();
     }
 }
+
 function main() {
 
-    for (var att in hostList.data.hostlist) {
-        var h = {};
-        h.name = att;
-        h.hpcc_rack = +att.split("-")[1];
-        h.hpcc_node = +att.split("-")[2].split(".")[0];
-        h.index = hosts.length;
-
-        // to contain the historical query results
-        hostResults[h.name] = {};
-        hostResults[h.name].index = h.index;
-        hostResults[h.name].arr = [];
-        serviceListattr.forEach(d=>hostResults[att][d]=[]);
-        hosts.push(h);
-    }
+    inithostResults ();
 
     drawHorizontalView();
 
     getDataWorker.postMessage({action:"init",value:{
             hosts:hosts,
             db:db,
+            serviceFullList:serviceFullList,
+            serviceLists:serviceLists,
+            serviceList_selected :serviceList_selected,
+            serviceListattr:serviceListattr
         }});
     getDataWorker.addEventListener('message',({data})=>{
         if (data.status==='done') {
@@ -858,13 +869,26 @@ function main() {
             onSavingbatchfiles(data.result.arr,onSavingFile); // saveImages.js
         }
         if (data.action==='returnData'){
-            if (graphicControl.charType==="T-sne Chart")
-                TSneplot.data(data.result.arr).draw(data.result.nameh,data.result.index);
-            if (graphicControl.sumType === "RadarSummary") {
-                // console.log(data.result.index);
-                Radarplot.data(data.result.arr).drawSummarypoint(data.result.index );
+            if (data.result.hindex!==undefined && data.result.index < lastIndex) {
+                if (graphicControl.sumType === "RadarSummary" ) {
+                    Radarplot.data(data.result.arr).drawSummarypoint(data.result.index, data.result.hindex);
+                }
+            }
+
+        }else if (data.action==='returnDataHistory'){
+            if (data.result.hindex!==undefined&& data.result.index < lastIndex+1) {
+                if (graphicControl.charType === "T-sne Chart") {
+                    // console.log(data.result.arr)
+                    TSneplot.data(data.result.arr).draw(data.result.nameh, data.result.index);
+                }if (graphicControl.sumType === "RadarSummary") {
+                    Radarplot.data(data.result.arr).drawSummarypoint(data.result.index, data.result.hindex);
+                }
+                MetricController.data(data.result.arr).drawSummary(data.result.hindex);
             }
         }
+        if (data.action==='DataServices') {
+                MetricController.datasummary(data.result.arr);
+            }
     }, false);
     request();
 }
@@ -880,19 +904,42 @@ function onSavingFile (data){
 }
 var currentlastIndex;
 var speedup= 0;
+
+function updatetimeline(index) {
+    if (recordonly) {
+        const timearr= d3.scaleTime().domain(timerange.map(d => new Date(d))).ticks(formatRealtime);
+        if(!hostResults['timespan'])
+            hostResults['timespan'] = [];
+        hostResults['timespan'] = d3.merge([hostResults['timespan'],timearr.map(d=>new Date(d))]);
+        expectedLength += timearr.length;
+    }
+    else {
+        if(!hostResults['timespan'])
+            hostResults['timespan']=[];
+        if (isRealtime)
+            hostResults['timespan'].push(new Date());
+        else
+            hostResults['timespan']=sampleS['timespan'].slice(0,index+1)
+        expectedLength++;
+    }
+}
+
 function request(){
     bin.data([]);
     var count = 0;
     var countbuffer = 0;
     var iteration = 0;
     var haveMiddle = false;
-    currentMiliseconds = new Date().getTime();  // For simulation
+    currentMiliseconds = new Date();  // For simulation
     query_time=currentMiliseconds;
     lastIndex = 0;
+    currentlastIndex = 0;
     var countarr = [];
     var requeststatus =true;
     var countrecord = 0;
     var missingtimetex = false;
+
+    updatetimeline(0);
     interval2 = new IntervalTimer(function (simDuration) {
         var midlehandle = function (ri){
             let returniteration = ri[0];
@@ -911,10 +958,11 @@ function request(){
 
                 // Draw date
                 d3.select(".currentDate")
-                    .text("" + new Date(currentMiliseconds).toDateString());
+                    .text("" + currentMiliseconds.toDateString());
 
                 // cal to plot
                 bin.data([]);
+                currentlastIndex = iteration+iterationstep-1;
                 drawsummary();
                 if (graphicControl.mode===layout.HORIZONTAL) {
                     if (graphicControl.charType === "T-sne Chart")
@@ -929,7 +977,9 @@ function request(){
                 requeststatus = true;
                 haveMiddle = false;
                 iteration += iterationstep;
+                updatetimeline(iteration);
             }
+            currentlastIndex = iteration;
             Scatterplot.init(xTimeSummaryScale(0) + swidth / 2);
             xTimeSummaryScaleStep = d3.scaleLinear()
                 .domain([0, hosts.length - 1]) // input
@@ -961,11 +1011,11 @@ function request(){
                         .attr("y2", currentHostY);
 
                 svg.selectAll(".currentTextGroup")
-                    .attr('transform', 'translate(' + (x2 + 2) + ',' + (sHeight - 36) + ')');
+                    .attr('transform', 'translate(' + (x2 + 2) + ',' + (summaryGroup_op.height - 36 -10) + ')');
                 svg.selectAll(".currentText")
                     .text("Latest update:");
                 svg.selectAll(".currentTimeText")
-                    .text(new Date(query_time).timeNow2());
+                    .text(query_time.timeNow2());
                 svg.selectAll(".currentHostText")
                     .text(currentHostname);
             }
@@ -1004,31 +1054,34 @@ function request(){
             }
         };
         if (requeststatus) {
-            var oldrack = hosts[countbuffer].hpcc_rack;
-            if (isRealtime) {
-                step(iteration, countbuffer).then((ri) => {
-                    midlehandle(ri);
-                    if (!recordonly)
-                        drawprocess();
-                    else {
-                        countrecord = countrecord +1;
-                        if (countbuffer>= (hosts.length)){
-                            console.log("done");
-                            interval2.stop();
+            try {
+                var oldrack = hosts[countbuffer].hpcc_rack;
+                if (isRealtime) {
+                    step(iteration, countbuffer).then((ri) => {
+                        midlehandle(ri);
+                        if (!recordonly)
+                            drawprocess();
+                        else {
+                            countrecord = countrecord + 1;
+                            if (countbuffer >= (hosts.length)) {
+                                console.log("done");
+                                interval2.stop();
+                            }
                         }
-                    }
-                });
-                countbuffer++;
-            }
-            else
-            {
-                do {
-                    let ri = step(iteration, countbuffer);
-                    midlehandle(ri);
+                    });
                     countbuffer++;
-                }while ((countbuffer < hosts.length) && (speedup===2||(hosts[countbuffer].hpcc_rack === oldrack)) && speedup);
-                speedup = 0;
-                drawprocess();
+                }
+                else {
+                    do {
+                        let ri = step(iteration, countbuffer);
+                        midlehandle(ri);
+                        countbuffer++;
+                    } while ((countbuffer < hosts.length) && (speedup === 2 || (hosts[countbuffer].hpcc_rack === oldrack)) && speedup);
+                    speedup = 0;
+                    drawprocess();
+                }
+            }catch(e){
+
             }
             if (countbuffer>= (hosts.length))
                 requeststatus = false; //stop request
@@ -1054,22 +1107,23 @@ function scaleThreshold(i){
 function drawsummary(initIndex){
     var arr = [];
     var xx;
-    console.log(lastIndex)
     if (initIndex===undefined){
-        currentlastIndex = hostResults[hosts[0].name].arr.length -1;
+        // currentlastIndex = hostResults[hosts[0].name].arr.length -1;
         lastIndex = currentlastIndex;
-        query_time = hostResults[hosts[hosts.length-1].name].arr[lastIndex].result.query_time;
+        query_time = hostResults['timespan'][lastIndex];
         xx = xTimeSummaryScale(scaleThreshold(lastIndex));
         // updateTimeText(); //time in end
     }else{
         lastIndex = initIndex;
-        query_time = hostResults[hosts[hosts.length-1].name].arr[lastIndex].result.query_time;
-        var temp = (maxstack-2)-(currentlastIndex-initIndex);
-        if (currentlastIndex > maxstack-2)
-            xx = xTimeSummaryScale(temp);
-        else {
-            temp = lastIndex;
-            xx = xTimeSummaryScale(lastIndex);
+        if (hostResults[hosts[hosts.length-1].name].arr[lastIndex]) {
+            query_time = hostResults['timespan'][lastIndex];
+            var temp = (maxstack - 2) - (currentlastIndex - initIndex);
+            if (currentlastIndex > maxstack - 2)
+                xx = xTimeSummaryScale(temp);
+            else {
+                temp = lastIndex;
+                xx = xTimeSummaryScale(lastIndex);
+            }
         }
 
     }
@@ -1082,7 +1136,7 @@ function drawsummary(initIndex){
                     // lastIndex = initIndex||(r.arr.length - 1);
                     // boxplot
                     if (lastIndex >= 0) {   // has some data
-                        var a = processData(r.arr[lastIndex].data.service.plugin_output, selectedService);
+                        var a = r.arr[lastIndex];
                         arr.push(a[0]);
                     }
                 }
@@ -1097,22 +1151,7 @@ function drawsummary(initIndex){
             case "Radar":
                 for (var h = 0; h < hosts.length; h++) {
                     var name = hosts[h].name;
-                    var r = hostResults[name];
-                    // lastIndex = initIndex||(r.arr.length - 1);
-                    // boxplot
-                    if (lastIndex >= 0) {   // has some data
-                        var arrServices = [];
-                        serviceList_selected.forEach((ser, indx) => {
-                            var obj = {};
-                            let dataextract = r[serviceListattr[indx]][lastIndex];
-                            if (dataextract)
-                                dataextract = dataextract.data.service.plugin_output;
-                            var a = processData(dataextract, ser);
-                            obj.a = a;
-                            arrServices.push(obj);
-
-                        })
-                    }
+                    arrServices = getDataByName_withLabel(hostResults, name, lastIndex, lastIndex,0.5);
                     arrServices.name = name;
                     arr.push(arrServices);
                 }
@@ -1121,10 +1160,10 @@ function drawsummary(initIndex){
                 //drawRadarsum(svg, arr, lastIndex, xx-radarsize);
                 break;
             case "RadarSummary":
-                console.log("-----------------")
-                console.log(temp === undefined ? lastIndex : temp)
-                console.log("-----------------")
-                getData(name, temp === undefined ? lastIndex : temp, true);
+                console.log("-----------------");
+                console.log(temp === undefined ? lastIndex : temp);
+                console.log("-----------------");
+                getData(name, temp === undefined ? lastIndex : temp,true,false);
                 if ((temp === undefined ? lastIndex : temp) >= maxstack - 1) Radarplot.shift();
                 break;
         }
@@ -1136,7 +1175,7 @@ function drawsummary(initIndex){
             bigdata[name]=[];
             var r = hostResults[name];
             for(var i = 0; i<lastIndex+1;i++) {
-                var a = processData(r.arr[i].data.service.plugin_output, selectedService);
+                var a = r.arr[i];
                 var temp = {};
                 temp[FIELD_MACHINE_ID] = name;
                 temp[selectedService] = a[0]===undefined?null:a[0];
@@ -1151,9 +1190,8 @@ function drawsummary(initIndex){
 function drawsummarypoint(harr){
     var arr = [];
     var xx;
-    lastIndex = hostResults[hosts[harr[0]].name].arrTemperature.length -1;
-    query_time = hostResults[hosts[harr[0]].name].arrTemperature[lastIndex].result.query_time;
-    
+    lastIndex = currentlastIndex;
+    query_time = hostResults['timespan'][currentlastIndex];
     //xx = xTimeSummaryScale(query_time);
     //updateTimeText();
 
@@ -1166,23 +1204,7 @@ function drawsummarypoint(harr){
             for (var i in harr) {
                 var h  = harr[i];
                 var name = hosts[h].name;
-                var r = hostResults[name];
-                // lastIndex = initIndex||(r.arr.length - 1);
-                // boxplot
-                if (lastIndex >= 0) {   // has some data
-                    var arrServices = [];
-                    serviceList_selected.forEach((ser, indx) => {
-                        try {
-                            var obj = {};
-                            let dataextract = r[serviceListattr[indx]][lastIndex];
-                            if (dataextract)
-                                dataextract = dataextract.data.service.plugin_output;
-                            var a = processData(dataextract, ser);
-                            obj.a = a;
-                            arrServices.push(obj);
-                        }catch(e){}
-                    })
-                }
+                arrServices = getDataByName_withLabel(hostResults, name, lastIndex, lastIndex,0.5);
                 arrServices.name = name;
                 arr.push(arrServices);
             }
@@ -1194,10 +1216,8 @@ function drawsummarypoint(harr){
             getData(name,lastIndex)
             // Radarplot.data(arr).drawSummarypoint(lastIndex);
             break;
-
-
-
     }
+    getData(name,lastIndex)
 }
 function shiftTimeText(){
     if (timelog.length > maxstack-1){ timelog.shift();
@@ -1209,7 +1229,7 @@ function shiftTimeText(){
     }
 }
 function updateTimeText(index){
-    if (index!= undefined)timelog.push (hostResults[hosts[(index||hosts.length)-1].name].arr.map(d=>d.result.query_time)[lastIndex]);
+    if (index!= undefined)timelog.push (hostResults['timespan'][lastIndex]);
     if (timelog.length>maxstack) timelog.shift();
     var boxtime = svg.selectAll(".boxTime")
         .data(timelog);
@@ -1223,7 +1243,7 @@ function updateTimeText(index){
     boxtime.enter().append("text")
         .attr("class", "boxTime")
         .attr("x", (d,i)=>xTimeSummaryScale(i)+ width/maxstack/2)
-        .attr("y", sHeight)
+        .attr("y", summaryGroup_op.height -10)
         .attr("fill", "#000")
         .style("font-style","italic")
         .style("text-anchor","end")
@@ -1232,50 +1252,7 @@ function updateTimeText(index){
         .attr("font-family", "sans-serif")
         .text(new Date(query_time).timeNow());
 }
-// Delete unnecessary files
-let processResult = processResult_old;
-function processResult_influxdb(r,hostname,index){
-    var obj = {};
-    obj.result = {};
-    if (r.results[0].series){
-        obj.result.query_time = new Date(r.results[0].series[0].values[index||0][0]);
-    }else
-        obj.result.query_time = new Date();
-    obj.data = {};
-    obj.data.service={};
-    obj.data.service.host_name = hostname;
-    if (index !== undefined ) {
-        obj.data.service.plugin_output = {results: r.results.map(d => {
-                let temp = {};
-                temp.statement_id = d.statement_id;
-                temp.series = [];
-                let tempsub = {};
-                const series = d.series[0];
-                tempsub.name = series.name;
-                tempsub.columns = series.columns;
-                tempsub.values = [series.values[index]];
-                temp.series.push(tempsub);
-                return temp;
-            })};
-    } else
-        obj.data.service.plugin_output = r;
-    return obj;
-}
-function processResult_old(r){
-    var obj = {};
-    obj.result = {};
-    obj.result.query_time = r.result.query_time;
-    obj.data = {};
-    obj.data.service={};
-    obj.data.service.host_name = r.data.service.host_name;
-    obj.data.service.plugin_output = r.data.service.plugin_output;
-    return obj;
-}
-const processResult_nagios = processResult_old;
 
-
-
-let processData = processData_old;
 
 function decimalColorToHTMLcolor(number) {
     //converts to a integer
@@ -1305,50 +1282,73 @@ function decimalColorToHTMLcolor(number) {
     return HTMLcolor;
 }
 
+// function simulateResults2(hostname,iter, s){
+//     var newService;
+//     let serviceIndex =  serviceList.findIndex(d=>d===s);
+//     newService = (sampleS[hostname][serviceListattr[serviceIndex]]||[])[iter];
+//     if (serviceIndex === 4) {
+//         if (sampleS[hostname]["arrPower_usage"]=== undefined && db!=="influxdb"&& db!=="csv") {
+//             var simisval = handlemissingdata(hostname,iter);
+//             sampleS[hostname]["arrPower_usage"] = [simisval];
+//         }else if (sampleS[hostname]["arrPower_usage"]!== undefined) {
+//             if (sampleS[hostname]["arrPower_usage"][iter] === undefined && db !== "influxdb" && db !== "csv") {
+//                 var simisval = handlemissingdata(hostname, iter);
+//                 sampleS[hostname]["arrPower_usage"][iter] = simisval;
+//             }
+//             newService = sampleS[hostname]["arrPower_usage"][iter];
+//         }
+//     }
+//     if (newService === undefined){
+//         newService ={};
+//         newService.result = {};
+//         newService.result.query_time = query_time;
+//         newService.data = {};
+//         newService.data.service={};
+//         newService.data.service.host_name = hostname;
+//         newService.data.service.plugin_output = undefined;
+//     }else {
+//         if (db === "influxdb")
+//             try {
+//                 newService.result.query_time = d3.timeParse("%Y-%m-%dT%H:%M:%S.%LZ")(newService.result.query_time).getTime();
+//             }catch(e){
+//
+//             }
+//     }
+//     return newService;
+// }
 function simulateResults2(hostname,iter, s){
     var newService;
     let serviceIndex =  serviceList.findIndex(d=>d===s);
     newService = (sampleS[hostname][serviceListattr[serviceIndex]]||[])[iter];
     if (serviceIndex === 4) {
-        if (sampleS[hostname]["arrPower_usage"]=== undefined && db!=="influxdb") {
+        if (sampleS[hostname]["arrPower_usage"]=== undefined && db!=="influxdb"&& db!=="csv") {
             var simisval = handlemissingdata(hostname,iter);
             sampleS[hostname]["arrPower_usage"] = [simisval];
-        }else if (sampleS[hostname]["arrPower_usage"][iter]=== undefined  && db!=="influxdb"){
-            var simisval = handlemissingdata(hostname,iter);
-            sampleS[hostname]["arrPower_usage"][iter] = simisval;
-        }
-        newService = sampleS[hostname]["arrPower_usage"][iter];
-    }
-    if (newService === undefined){
-        newService ={};
-        newService.result = {};
-        newService.result.query_time = query_time;
-        newService.data = {};
-        newService.data.service={};
-        newService.data.service.host_name = hostname;
-        newService.data.service.plugin_output = undefined;
-    }else {
-        if (db === "influxdb")
-            try {
-                newService.result.query_time = d3.timeParse("%Y-%m-%dT%H:%M:%S.%LZ")(newService.result.query_time).getTime();
-            }catch(e){
-
+            newService = simisval;
+        }else if (sampleS[hostname]["arrPower_usage"]!== undefined) {
+            if (sampleS[hostname]["arrPower_usage"][iter] === undefined && db !== "influxdb" && db !== "csv") {
+                var simisval = handlemissingdata(hostname, iter);
+                sampleS[hostname]["arrPower_usage"][iter] = simisval;
             }
+            newService = sampleS[hostname]["arrPower_usage"][iter];
+        }
     }
+    if (newService===undefined)
+        newService = [undefined];
+    else
+        newService = newService.map(d=>d===null?undefined:d);
     return newService;
 }
 
 function handlemissingdata(hostname,iter){
-    var simisval = jQuery.extend(true, {}, sampleS[hostname]["arrTemperature"][iter]);
-    var simval = processData(simisval.data.service.plugin_output, serviceList[0]);
-    // simval = (simval[0]+simval[1])/2;
+    // var simisval = jQuery.extend(true, {}, sampleS[hostname]["arrTemperature"][iter]);
+    var simisval = sampleS[hostname]["arrTemperature"][iter];
+    var simval = simisval.slice(0);
     simval = (simval[0]+simval[1]+20);
-    var tempscale = d3.scaleLinear().domain([thresholds[0][0],thresholds[0][1]]).range([thresholds[4][0],thresholds[4][1]]);
     if (simval!==undefinedValue && !isNaN(simval) )
-        //simisval.data.service.plugin_output = "OK - The average power consumed in the last one minute = "+Math.round(tempscale(simval)*3.2)+" W";
-        simisval.data.service.plugin_output = "OK - The average power consumed in the last one minute = "+Math.floor(simval*3.2)+" W";
+        simisval= [Math.floor(simval)];
     else
-        simisval.data.service.plugin_output = "UNKNOWN";
+        simisval= [];
     return simisval;
 }
 function gaussianRand() {
@@ -1369,11 +1369,11 @@ function getRackx(hpcc_rack,hpcc_node,isVertical){
         return racksnewor[(hpcc_rack - 1)*2 + (hpcc_node%2?0:1)].x;
     return racksnewor[hpcc_rack - 1].x;
 }
-function plotResult(result,name) {
+function plotResult(result,name,index) {
     // Check if we should reset the starting point
     if (firstTime) {
-        currentMiliseconds = result.result.query_time;
-        hostfirst = result.data.service.host_name;
+        currentMiliseconds = hostResults['timespan'][0];
+        hostfirst = name;
         xTimeScale = d3.scaleLinear()
             .domain([0, maxstack-1]);
         // get Time
@@ -1381,16 +1381,16 @@ function plotResult(result,name) {
     }
     firstTime = false;
 
-    if (result.result.query_time)
-        query_time = result.result.query_time||query_time;  // for drawing current timeline in Summary panel
+    if (hostResults['timespan'][index||lastIndex])
+        query_time = hostResults['timespan'][index||lastIndex]||query_time;  // for drawing current timeline in Summary panel
     else
-        result.result.query_time = query_time+1000;
+        hostResults['timespan'][index||lastIndex] = new Date (query_time.getTime() + (hostResults['timespan'][1].getTime()-hostResults['timespan'][0].getTime()));
     currentHostname = name;
 
     // Process the array data ***************************************
     var r = hostResults[name];
-    var hpcc_rack = +name.split("-")[1];
-    var hpcc_node = +name.split("-")[2].split(".")[0];
+    var hpcc_rack = hostList.data.hostlist[name].rack|| (+name.split("-")[1]);
+    var hpcc_node = hostList.data.hostlist[name].node|| (+name.split("-")[2].split(".")[0]);
 
     var xStart = getRackx(hpcc_rack,hpcc_node,graphicControl.mode)+15;
 
@@ -1420,24 +1420,12 @@ function plotResult(result,name) {
         case "Heatmap":
         case "Area Chart":
             for (var i=startinde; i<r.arr.length;i++){
-                let a ;
-                try {
-                    a = processData(r.arr[i].data.service.plugin_output, selectedService);
-                } catch (e){
-                    a = processData(undefined, selectedService);
-                    r.arr[i] ={};
-                    r.arr[i].result = {};
-                    r.arr[i].result.query_time = query_time;
-                    r.arr[i].data = {};
-                    r.arr[i].data.service={};
-                    r.arr[i].data.service.host_name = currentHostname;
-                    r.arr[i].data.service.plugin_output = undefined;
-                }
+                let a  = r.arr[i];
                 var obj = {};
                 obj.temp1 = a[0];
                 obj.temp2 = a[1];
                 obj.temp3 = a[2];
-                obj.query_time =r.arr[i].result.query_time;
+                obj.query_time =hostResults.timespan[i];
                 obj.x = xTimeScale(i-startinde);
                 arr.push(obj);
                 currentHostX = obj.x ;
@@ -1455,7 +1443,7 @@ function plotResult(result,name) {
         case "T-sne Chart":
             initTsneView();
             if (!speedup) {
-                getData(name,lastIndex);
+                getData(name,index||lastIndex,true,true);
             }
     }
 
@@ -1470,66 +1458,77 @@ function initTsneView() {
 
 function plotHeat(arr,name,hpcc_rack,hpcc_node,xStart,y,isSingle){
     svgStore.detailView.g.selectAll(".RackSummary").remove();
-    svgStore.detailView.items.selectAll("."+name).remove();
+    svgStore.detailView.items.selectAll("."+fixName2Class(name)).remove();
     if (isSingle)
         y= y+10;
-    for (var i=0; i<arr.length;i++){
-        var obj = arr[i];
-        var x = xTimeScale(i);
+
+        // var obj = arr[i];
+        // var x = xTimeScale(i);
         // if (arr.length>1)
         //     x = xMin+ i*(xMax-xMin)/(arr.length);
-        svgStore.detailView.items.append("rect")
-            .attr("class", name)
-            .attr("x", x)
-            .attr("y", y-10)
-            .attr("width", node_size)
-            .attr("height", node_size )
-            .attr("fill", function (d) {
+    let newg = svgStore.detailView.items.selectAll("g."+fixName2Class(name)).data([{name:name,val:arr}]);
+    newg.exit().remove();
+    newg = newg.enter().append('g')
+        .merge(newg)
+        .attr('class',fixName2Class(name))
+        .attr('transform','translate(0,'+y+')').on("mouseover",mouseoverNode);
+    let newrect = newg.selectAll("."+fixName2Class(name)).data(d=>d.val);
+        newrect.exit().remove();
+    newrect.enter()
+        .append("rect")
+        .attr("width", node_size)
+        .attr("height", node_size )
+        .attr("stroke", "#000")
+        .attr("stroke-width", 0.05)
+        .merge(newrect)
+            .attr("class", 'compute '+fixName2Class(name))
+            .attr("x",(d,i)=> xTimeScale(i))
+            .attr("y", -10)
+
+            .attr("fill", function (obj) {
                 if (obj.temp1===undefinedValue)
                     return undefinedColor;
                 else
                     return color(obj.temp1);
             })
-            .attr("fill-opacity",function (d) {
+            .attr("fill-opacity",function (obj) {
                 return opa(obj.temp1);
-            })
-            .attr("stroke", "#000")
-            .attr("stroke-width", 0.05)
-            .on("mouseover", function (d) {
-                mouseoverNode (this);
             })
         ;//.on("mouseout", mouseoutNode);
 
         if ((selectedService==="Temperature" || selectedService==="Fans_speed")&&isSingle!=true)    {
-            svgStore.detailView.items.append("rect")
-                .attr("class", name)
-                .attr("x", x)
-                .attr("y", y+node_size-9)
+            let newrect = newg.selectAll(".rct2."+fixName2Class(name)).data(arr);
+            newrect.exit().remove();
+            newrect.enter()
+                .append("rect")
                 .attr("width", node_size)
                 .attr("height", node_size )
-                .attr("fill", function (d) {
+                .attr("stroke", "#000")
+                .attr("stroke-width", 0.05)
+                .merge(newrect)
+                .attr("class", 'rct2 compute '+fixName2Class(name))
+                .attr("x",(d,i)=> xTimeScale(i))
+                .attr("y", node_size-9)
+
+                .attr("fill", function (obj) {
                     if (obj.temp2==undefinedValue)
                         return undefinedColor;
                     else
                         return color(obj.temp2);
                 })
-                .attr("fill-opacity",function (d) {
+                .attr("fill-opacity",function (obj) {
                     return opa(obj.temp2);
                 })
-                .attr("stroke", "#000")
-                .attr("stroke-width", 0.05)
-                .on("mouseover", function (d) {
-                    mouseoverNode (this);
-                })
-            ;//.on("mouseout", mouseoutNode);
+            ;
         }
-    }
+
     // *****************************************
     /// drawSummaryAreaChart(hpcc_rack, xStart);
 }
 function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y,serindex){
+    let range = serviceLists[serindex].sub[0].range;
     var yScale = d3.scaleLinear()
-        .domain([(thresholds[serindex][1]-thresholds[serindex][0])/2,thresholds[serindex][1]]) //  baseTemperature=60
+        .domain([(range[1]-range[0])/2,range[1]]) //  baseTemperature=60
         .range([0, node_size*2]); // output
 
     var area = d3.area()
@@ -1539,26 +1538,26 @@ function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y,serindex){
         .y1(function(d) { return y-yScale(d.temp1); })
         .curve(d3.curveCatmullRom);
 
-    svgStore.detailView.items.selectAll("."+name).remove();
+    svgStore.detailView.items.selectAll("."+fixName2Class(name)).remove();
     svgStore.detailView.items
-        .append('clipPath').attr("class", name)
-        .attr("id", "cp"+name).append("path")
+        .append('clipPath').attr("class",  'compute '+fixName2Class(name))
+        .attr("id", "cp"+fixName2Class(name)).append("path")
         .datum(arr) // 10. Binds data to the line
         .attr("d", area);
     svgStore.detailView.items
         .append('rect')
-        .attr("class", name)
+        .attr("class",  'compute '+fixName2Class(name))
         .attr('width',xTimeScale(arr[arr.length-1].x)-xTimeScale(arr[0].x))
         .attr('height',yScale.range()[1]*2)
         .attr('x',arr[0].x)
-        .attr('y',y-yScale.range()[1]).attr("fill","url(#mainColor)")
-        .attr("clip-path","url(#cp"+name+")").on("mouseover", function (d) {
-        mouseoverNode (this);
+        .attr('y',y-yScale.range()[1]).attr("fill","url(#lradient)")
+        .attr("clip-path","url(#cp"+fixName2Class(name)+")").on("mouseover", function (d) {
+        mouseoverNode ({name:name});
     });
 
     svgStore.detailView.items.append("path")
         .datum(arr) // 10. Binds data to the line
-        .attr("class", name)
+        .attr("class",'compute ' + fixName2Class(name))
         .attr("stroke","#000")
         .attr("stroke-width",0.2)
         .attr("d", area)
@@ -1567,20 +1566,21 @@ function plotArea(arr,name,hpcc_rack,hpcc_node,xStart,y,serindex){
         })
         .style("fill", "none")
         .on("mouseover", function (d) {
-            mouseoverNode (this);
+            mouseoverNode ({name:name});
         })
     ;
 }
 
 
-function getData(nameh,index,skip){
+function getData(nameh,index,skip,usepast){
     if(!isbusy || skip === true) {
         isbusy = true;
         getDataWorker.postMessage({
             action: "getbatchData", value: {
                 lastIndex: index,
                 hostResults: hostResults,
-                host: nameh
+                host: nameh,
+                usepast: usepast
             }
         });
     }
@@ -1590,18 +1590,19 @@ function drawSummaryAreaChart(rack, xStart) {
     var arr2 = [];
     var binStep = 8; // pixels
     var maxX = 0;  // The latest x position, to draw the baseline 60 F
-    for (var att in hostResults) {
-        var hpcc_rack = +att.split("-")[1];
-        var hpcc_node = +att.split("-")[2].split(".")[0];
+    hosts.forEach(hos=>{
+        var att = hos.name;
+        var hpcc_rack = hos.hpcc_rack;
+        var hpcc_node = ho.hpcc_node;
         if (hpcc_rack == rack) {
             var r = hostResults[att];
             for (var i = 0; i < r.arr.length; i++) {
-                var a = processData(r.arr[i].data.service.plugin_output, selectedService);
+                var a = r.arr[i];
                 var obj = {};
                 obj.temp1 = a[0];
                 obj.temp2 = a[1];
                 obj.temp3 = a[2];
-                obj.query_time = r.arr[i].result.query_time;
+                obj.query_time = hostResults['timespan'][i];
                 obj.x = xTimeScale(i);
                 if (obj.x >maxX)
                     maxX = obj.x ;  // The latest x position, to draw the baseline 60 F
@@ -1612,7 +1613,7 @@ function drawSummaryAreaChart(rack, xStart) {
                 arr2[obj.bin].push(obj);
             }
         }
-    }
+    });
     var arr3 = [];
     for (var att in arr2) {
         if (arr2[att].length>=2){
@@ -1727,13 +1728,13 @@ function pauseRequest(){
 
 }
 
-function realTimesetting (option,db,init){
+function realTimesetting (option,db,init,data){
     isRealtime = option;
-    getDataWorker.postMessage({action:'isRealtime',value:option,db: db});
+    getDataWorker.postMessage({action:'isRealtime',value:option,db: db,data:data,hostList:hostList});
     if (option){
         processData = eval('processData_'+db);
-        simDuration = 1000;
-        simDurationinit = 1000;
+        simDuration = 200;
+        simDurationinit = 200;
         numberOfMinutes = 26*60;
     }else{
         processData = db?eval('processData_'+db):processData_old;
@@ -1746,7 +1747,8 @@ function realTimesetting (option,db,init){
 }
 function playchange(){
     var e = d3.select('.pause').node();
-    interval2.pause();
+    if (interval2)
+        interval2.pause();
     e.value = "true";
     $(e).addClass('active');
     $(e.querySelector('i')).removeClass('fa-pause pauseicon').addClass('fa-play pauseicon');
@@ -1758,7 +1760,8 @@ function exit_warp () {
 }
 function pausechange(){
     var e = d3.select('.pause').node();
-    interval2.resume();
+    if (interval2)
+        interval2.resume();
     e.value = "false";
     $(e).removeClass('active');
     $(e.querySelector('i')).removeClass('fa-play pauseicon').addClass('fa-pause pauseicon');
@@ -1769,8 +1772,11 @@ function resetRequest(){
     pausechange();
     tool_tip.hide();
     firstTime = true;
-    interval2.stop();
+    if (interval2)
+        interval2.stop();
     hostResults = {};
+    expectedLength = 0;
+    formatRealtime = getformattime(+timestep_query.split(/[a-z]/)[0],timeshortconvert(timestep_query.match(/[a-z]/)[0]));
     var count =0;
     for (var att in hostList.data.hostlist) {
         // to contain the historical query results
@@ -1779,12 +1785,12 @@ function resetRequest(){
         hostResults[att].arr = [];
         serviceListattr.forEach(d=>hostResults[att][d]=[]);
         count++;
-
-        svg.selectAll("."+att).remove();
     }
+    svg.selectAll(".compute").remove();
+    svg.selectAll(".h").remove();
     svg.selectAll(".graphsum").remove();
     svg.selectAll(".connectTimeline").style("stroke-opacity", 1);
-    Radarplot.init();
+    Radarplot.init().clustercallback(d=>TSneplot.clusterBin(d));
     TSneplot.reset(true);
     timelog = [];
     jobList = undefined;
@@ -1794,28 +1800,7 @@ function resetRequest(){
 function loadData(){
 
 }
-function addDatasetsOptions() {
-    let select= d3.select("#datasetsSelect")
-        .selectAll('li')
-        .data(serviceList_selected)
-        .enter()
-        .append('li')
-        .attr('class','collection-item avatar valign-wrapper')
-        .attr('value',d=>d);
-    select.append('img')
-        .attr('class',"circle")
-        .attr('src',d=>"images/"+d+".png");
-    select.append('h6').attr('class','title').text(d=>d);
 
-    select.on("click",loadNewData);
-    document.getElementById('datasetsSelect').value = initialService;  //************************************************
-    selectedService = document.getElementById("datasetsSelect").value;
-    const trig = d3.select("#datasetsSelectTrigger");
-    trig.select('img').attr('src',"images/"+selectedService+".png");
-    trig.select('span').text(selectedService);
-
-    //loadData();
-}
 
 function loadNewData(d) {
     //alert(this.options[this.selectedIndex].text + " this.selectedIndex="+this.selectedIndex);
@@ -1845,7 +1830,7 @@ function requestServicenagios(count,serin) {
         xhr.onreadystatechange = function(e) {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    var result = processResult(JSON.parse(this.responseText));
+                    var result = processResult(JSON.parse(this.responseText),serviceList[serin]);
                     var name = result.data.service.host_name;
                     hostResults[name][serviceListattr[serin]].push(result);
                     if (selectedService === serviceList[serin]) {
@@ -1870,28 +1855,36 @@ function ip2hostname (address) {
     const strArr = address.split(".");
     return "compute-"+ strArr[2] + "-" + strArr[3];
 }
-
+let expectedLength = 0;
 function requestServiceinfluxdb(count,serin) {
+    if(recordonly) {
+        timearr = d3.scaleTime().domain(timerange.map(d => new Date(d))).ticks(formatRealtime);
+        hostResults.timespan = timearr;
+    }
     return new Promise(function(resolve, reject) {
         const xhr = new XMLHttpRequest();
         const ip = "10.101."+ hosts[count].hpcc_rack +"." + hosts[count].hpcc_node;
+        var name = hosts[count].name;
+        const returnLength = expectedLength - hostResults[name][serviceListattr[serin]].length;
         xhr.onreadystatechange = function(e) {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    var name = hosts[count].name;
                     const responseJSON = JSON.parse(this.responseText);
                     let index = 0;
                     if (!recordonly){
-                        var result = processResult(responseJSON,name);
+                        var result = processResult(responseJSON,name,undefined,serviceList[serin]);
                         hostResults[name][serviceListattr[serin]].push(result);
                     }else {
                         if (responseJSON.results[0].series) {
-                            responseJSON.results[0].series[0].values = _(responseJSON.results[0].series[0].values).uniq(d=>d[0]);
-                            const returnLength = responseJSON.results[0].series[0].values.length;
-                            for (let i = 0; i < returnLength; i++)
-                                hostResults[name][serviceListattr[serin]].push(processResult(responseJSON, name, i));
+                            // responseJSON.results[0].series[0].values = _(responseJSON.results[0].series[0].values).uniq(d=>d[0]);
+                            // const returnLength = responseJSON.results[0].series[0].values.length;
+                            for (let i = 0; i <returnLength; i++){
+                                let rr = processResult(responseJSON, name, i,serviceList[serin]);
+                                hostResults[name][serviceListattr[serin]].push(rr);
+                            }
                         }else
-                            hostResults[name][serviceListattr[serin]].push(processResult(responseJSON, name));
+                            for (let i = 0; i < returnLength; i++)
+                                hostResults[name][serviceListattr[serin]].push(processResult(undefined, name,undefined,serviceList[serin]));
                     }
                     if (selectedService === serviceList[serin]) {
                         hostResults[name].arr = hostResults[name][serviceListattr[serin]];
@@ -1900,11 +1893,19 @@ function requestServiceinfluxdb(count,serin) {
                     }
                     resolve(xhr.response);
                 } else {
+                    for (let i = 0; i < returnLength; i++){
+                        var result = processResult(undefined,name,undefined,serviceList[serin]);
+                        hostResults[name][serviceListattr[serin]].push(result);
+                    }
                     reject(xhr.status);
                 }
             }
         };
         xhr.ontimeout = function () {
+            for (let i = 0; i < returnLength; i++){
+                var result = processResult(undefined,name,undefined,serviceList[serin]);
+                hostResults[name][serviceListattr[serin]].push(result);
+            }
             reject('timeout');
         };
         let query;
@@ -1921,6 +1922,14 @@ let requestService = eval('requestService'+db);
 // let timerange = ["2019-03-21T14:00:00Z","2019-03-21T17:30:00Z"]; // event 21 march 2019
 let timerange = ["2019-04-26T00:00:00Z","2019-04-27T00:00:00Z"];
 let timestep_query = "5m";
+let formatRealtime = getformattime(+timestep_query.split(/[a-z]/)[0],timeshortconvert(timestep_query.match(/[a-z]/)[0]));
+function timeshortconvert(us){
+    switch(us){
+        case 'm': return 'Minute';
+        case 'h': return 'Hour';
+        case 'w': return 'Week';
+    }
+}
 
 function requestRT(iteration,count) {
     var promises;
@@ -1947,12 +1956,12 @@ function step (iteration, count){
                 var name = hosts[count].name;
                 hostResults[name].arr.push(result);
                 // console.log(hosts[count].name+" "+hostResults[name]);
-                serviceList_selected.forEach ((s,index)=>{
-                    var result = simulateResults2(hosts[count].name, iteration, serviceList[index]);
-                    hostResults[name][serviceListattr[index]].push(result);
+                serviceList_selected.forEach ((s)=>{
+                    var result = simulateResults2(hosts[count].name, iteration, serviceLists[s.index].text);
+                    hostResults[name][serviceListattr[s.index]].push(result);
                 });
 
-                plotResult(result, name);
+                plotResult(result, name,iteration);
                 iteration++;
             }
             iteration = tmp;
@@ -1960,31 +1969,8 @@ function step (iteration, count){
     }
     //return [iteration, count];
 }
-function getJoblist (iteration,reset){
-    try {
-        if (reset===true || reset===undefined)
-            jobList = [];
-        hosts.forEach(h => {
-            var result = simulateResults2(h.name, iteration||lastIndex, "Job_scheduling");
-            const resultObj = processData(result.data.service.plugin_output, "Job_scheduling")[0];
-            if (resultObj) {
-                resultObj.forEach(d=>{
-                    d.nodes= d.nodes.split(',')});
-                jobList = _.union(jobList, resultObj);
-            }
-        });
-        // handle dupliacte jobID
-        jobList = _.chain(jobList)
-            .groupBy(d=>d.jobID).values().map(d=>d.reduce((a,b)=>{a.nodes = _.union(a.nodes,b.nodes); return a;})).value();
-        //draw userlist data
-        TSneplot.drawUserlist(query_time);
-    }catch(e){}
-}
-function current_userData () {
-    let jobByuser = d3.nest().key(function(uD){return uD.user}).entries( jobList);
-    jobByuser.forEach(d=>d.unqinode= _.chain(d.values).map(d=>d.nodes).flatten().uniq().value());
-    return jobByuser;
-}
+
+
 d3.select("html").on("keydown", function() {
     switch(d3.event.keyCode){
         case 27:
@@ -1997,168 +1983,282 @@ d3.select("html").on("keydown", function() {
 
 });
 
-// ui part
-function openNav() {
-    d3.select("#mySidenav").classed("sideIn",true);
-    d3.select("#Maincontent").classed("sideIn",true);
-    // _.delay(resetSize, 500);
-}
-
-function closeNav() {
-    d3.select("#mySidenav").classed("sideIn",false);
-    d3.select("#Maincontent").classed("sideIn",false);
-    // _.delay(resetSize, 500);
-}
 // pause when not use , prevent frozen hiperView
 
+function updateSummaryChartAll() {
+    switch (graphicControl.sumType) {
+        case "Scatterplot":
+            d3.select("#scatterzone").style("visibility", "visible");
+            svg.selectAll(".graphsum").remove();
+            for (var i = currentlastIndex > (maxstack - 2) ? (currentlastIndex - maxstack + 2) : 0; i < (currentlastIndex + 1); i++) {
+                drawsummary(i);
+            }
+            break;
+        case "Boxplot":
+        case "Radar":
+        case "RadarSummary":
+            svg.selectAll(".graphsum").remove();
+            d3.select("#scatterzone").style("visibility", "hidden");
+            for (var i = currentlastIndex > (maxstack - 2) ? (currentlastIndex - maxstack + 2) : 0; i < (currentlastIndex + 1); i++) {
+                drawsummary(i);
+            }
+            break;
+    }
+}
+
 $( document ).ready(function() {
-    // $(window).on("blur focus", function(e) {
-    //     var prevType = $(this).data("prevType");
-    //
-    //     if (prevType != e.type) {   //  reduce double fire issues
-    //         switch (e.type) {
-    //             case "blur":
-    //                 $(this).data("playstatus",d3.select('.pause').node().value);
-    //                 playchange();
-    //                 break;
-    //             case "focus":
-    //                 // $('div').text("Focused");
-    //                 if ($(this).data("playstatus")=="false")
-    //                     pausechange();
-    //                 break;
-    //         }
-    //     }
-    //     $(this).data("prevType", e.type);
-    // });
     console.log('ready');
+    $('.fixed-action-btn').floatingActionButton({
+        direction: 'left',
+        hoverEnabled: false
+    });
     $('.collapsible').collapsible();
     $('.modal').modal();
     $('.dropdown-trigger').dropdown();
     $('.tabs').tabs();
     $('.sidenav').sidenav();
     discovery('#sideNavbtn');
+    openNav();
     //$('.tap-target').tapTarget({onOpen: discovery});
 
     d3.select("#DarkTheme").on("click",switchTheme);
+    changeRadarColor(colorArr.Radar[0]);
+    // color scale create
+    creatContain(d3.select('#RadarColor').select('.collapsible-body>.pickercontain'), colorScaleList, colorArr.Radar, onClickRadarColor);
 
+    d3.select('#clusterDisplay').on('change',function(){
+        TsnePlotopt.runopt.clusterDisplay = this.value;
+        TSneplot.runopt(TsnePlotopt.runopt);
+    });
+    d3.select('#clusterProject').on('change',function(){
+        TsnePlotopt.runopt.clusterProject = this.value;
+        TSneplot.runopt(TsnePlotopt.runopt);
+    });
+    d3.select('#clusterMethod').on('change',function(){
+        Radarplot_opt.clusterMethod = this.value;
+        Radarplot.binopt(Radarplot_opt);
+        updateSummaryChartAll();
+    });
     d3.select('#chartType_control').on("change", function () {
         var sect = document.getElementById("chartType_control");
         graphicControl.charType = sect.options[sect.selectedIndex].value;
+        controlView(graphicControl);
     });
 
     d3.select('#summaryType_control').on("change", function () {
         var sect = document.getElementById("summaryType_control");
         graphicControl.sumType = sect.options[sect.selectedIndex].value;
         svg.select(".graphsum").remove();
+        controlView(graphicControl);
         pannelselection(false);
-        switch(graphicControl.sumType){
-            case "Scatterplot":
-                d3.select("#scatterzone").style("visibility","visible");
-                svg.selectAll(".graphsum").remove();
-                for (var i =currentlastIndex>(maxstack-2)?(currentlastIndex-maxstack+2):0; i<(currentlastIndex+1);i++) {
-                    drawsummary(i);
-                }
-                break;
-            case "Boxplot":
-            case "Radar":
-            case "RadarSummary":
-                svg.selectAll(".graphsum").remove();
-                d3.select("#scatterzone").style("visibility","hidden");
-                for (var i =currentlastIndex>(maxstack-2)?(currentlastIndex-maxstack+2):0; i<(currentlastIndex+1);i++) {
-                    drawsummary(i);
-                }
-                break;
-        }
+        updateSummaryChartAll();
     });
     d3.select('#datacom').on("change", function () {
         d3.select('.cover').classed('hidden', false);
         exit_warp();
         spinner.spin(target);
         const choice = this.value;
-        const choicetext = d3.select('#datacom').node().selectedOptions[0].text;
-        setTimeout(() => {
-            if (choice !== "nagios" && choice !== "influxdb") {
-//                 d3.json("data/" + choice + ".json", function (error, data) {
-//                     if (error) {
-                d3.json("data/" + choice + ".json", function (error, data) {
-                    if (error){
-                        M.toast({html: 'Local data does not exist, try to query from the internet!'})
-                        d3.json("https://media.githubusercontent.com/media/iDataVisualizationLab/HPCC/master/HiperView/data/" + choice + ".json", function (error, data) {
-                            if (error){
-
-                            }
-                            loadata1(data)
-                        });
-                        return;
+        const choicetext = d3.select(d3.select('#datacom').node().selectedOptions[0]).attr('data-date');
+        if (choice!=='csv') {
+            if (db === 'csv') { //reload hostlist
+                d3.json('data/hotslist_Quanah.json', function (error, data) {
+                    if (error) {
+                    } else {
+                        firstTime = true;
+                        hostList = data;
+                        systemFormat();
+                        inithostResults();
+                        MetricController.axisSchema(serviceFullList, true).update();
+                        addDatasetsOptions()
                     }
-                    loadata1(data)
                 });
-//                         return;
-//                     }
-//                     loadata1(data)
-//                 });
             }
-            else {
-                realTimesetting(true,choice);
-                db = choice;
-                requestService = eval('requestService'+choice);
-                processResult = eval('processResult_'+choice);
-                d3.select('.cover').classed('hidden', true);
-                spinner.stop();
-            }
-        },0);
-        function loadata1(data){
+            oldchoose =$('#datacom').val();
+                setTimeout(() => {
+                if (choice !== "nagios" && choice !== "influxdb") {
+                d3.json("data/" + choice + ".json", function (error, data) {
+                    if (error) {
+                        d3.json("data/" + choice + ".json", function (error, data) {
+                            if (error) {
+                                M.toast({html: 'Local data does not exist, try to query from the internet!'})
+                                d3.json("https://media.githubusercontent.com/media/iDataVisualizationLab/HPCC/master/HiperView/data/" + choice + ".json", function (error, data) {
+                                    if (error) {
+
+                                    }
+                                    d3.json ("data/" + choice + "_job.json", function (error, job) {
+                                        if (error){
+                                            loadata1(data,undefined);
+                                            return;
+                                        }
+                                        loadata1(data,job);
+                                        return;
+                                    });
+                                });
+                                return;
+                            }
+                            return
+                        });
+                            return;
+                    }
+                    d3.json ("data/" + choice + "_job.json", function (error, job) {
+                        if (error){
+                            loadata1(data,undefined);
+                            return;
+                        }
+                        loadata1(data,job);
+                        return;
+                    });
+                });
+                }
+                else {
+                    d3.select(".currentDate")
+                        .text("" + (new Date()).toDateString());
+                    realTimesetting(true, choice);
+                    db = choice;
+                    requestService = eval('requestService' + choice);
+                    processResult = eval('processResult_' + choice);
+                    d3.select('.cover').classed('hidden', true);
+                    spinner.stop();
+                }
+
+            }, 0);
+        }else{
+
+            $('#datacom').val(oldchoose);
+            $('#data_input_file').trigger('click');
+        }
+        function loadata1(data,job){
+            data['timespan'] = data.timespan.map(d=>new Date(d3.timeFormat('%a %b %d %X CDT %Y')(new Date(d.replace('Z','')))));
             sampleS = data;
+            if(job)
+                hosts.forEach(h=>sampleS[h.name].arrJob_scheduling = job[h.name])
             if (choice.includes('influxdb')){
                 processResult = processResult_influxdb;
                 db = "influxdb";
-                realTimesetting(false,"influxdb");
+                realTimesetting(false,"influxdb",true);
             }else {
                 db = "nagios";
                 processResult = processResult_old;
-                realTimesetting(false);
+                realTimesetting(false,undefined,true);
             }
             d3.select(".currentDate")
-                .text("" + d3.timeParse("%d %b %Y")(choicetext).toDateString());
+                .text("" + (data['timespan'][0]).toDateString());
             resetRequest();
             d3.select('.cover').classed('hidden', true);
             spinner.stop();
         }
     });
+    let oldchoose =$('#datacom').val();
+    $('#data_input_file').on('click',()=>{d3.select('.cover').classed('hidden', true);
+        spinner.stop();})
+    $('#data_input_file').on('input', (evt) => {
+        $('#datacom').val('csv')
+        var f = evt.target.files[0];
+        var reader = new FileReader();
+        reader.onload = (function(theFile) {
+            return function(e) {
+                // Render thumbnail.
+                d3.select('.cover').classed('hidden', false);
+                exit_warp();
+                spinner.spin(target);
+                setTimeout(() => {
+                    d3.csv(e.target.result,function (error, data) {
+                    if (error){
+                    }else{
+                        loadata1(data);
+                        function loadata1(data){
+                            db = "csv";
+
+                            newdatatoFormat(data);
+
+                            inithostResults();
+                            processResult = processResult_csv;
+
+                            addDatasetsOptions()
+                            MetricController.axisSchema(serviceFullList,true).update();
+                            realTimesetting(false,"csv",true,data);
+                            d3.select(".currentDate")
+                                .text("" + new Date(data[0].timestamp).toDateString());
+                            resetRequest();
+                            d3.select('.cover').classed('hidden', true);
+                            spinner.stop();
+                        }
+                    }
+                })
+                },0);
+                // span.innerHTML = ['<img class="thumb" src="', e.target.result,
+                //     '" title="', escape(theFile.name), '"/>'].join('');
+                // document.getElementById('list').insertBefore(span, null);
+            };
+        })(f);
+
+        // Read in the image file as a data URL.
+        reader.readAsDataURL(f);
+    })
     spinner = new Spinner(opts).spin(target);
     setTimeout(() => {
         //load data
-        graphicControl.charType =  d3.select('#chartType_control').node().value;
-        graphicControl.sumType =  d3.select('#summaryType_control').node().value;
-        let choiceinit = d3.select('#datacom').node().value;
-        d3.select(".currentDate")
-            .text("" + d3.timeParse("%d %b %Y")(d3.select('#datacom').node().selectedOptions[0].text).toDateString()) ;
-        if (choiceinit.includes('influxdb')){
-            // processResult = processResult_influxdb;
-            db = "influxdb";
-            realTimesetting(false,"influxdb",true);
-        }else {
-            db = "nagios";
-            // processResult = processResult_old;
-            realTimesetting(false,undefined,true);
-        }
-        d3.json("data/" + d3.select('#datacom').node().value  + ".json", function (error, data) {
-            if (error) {
-                    M.toast({html: 'Local data does not exist, try to query from the internet!'});
-                d3.json("https://media.githubusercontent.com/media/iDataVisualizationLab/HPCC/master/HiperView/data/" + choiceinit + ".json", function (error, data) {
-                    if (error) throw error;
-                    loadata(data)
+        d3.json('data/hotslist_Quanah.json',function(error,data){
+            if(error) {
+            }else{
+                hostList = data;
+                inithostResults();
+
+            d3.select('#chartType_control').dispatch('change');
+            d3.select('#summaryType_control').dispatch('change');
+            let choiceinit = d3.select('#datacom').node().value;
+            if (choiceinit !== "nagios" && choiceinit !== "influxdb") {
+                // d3.select(".currentDate")
+                //     .text("" + d3.timeParse("%d %b %Y")(d3.select('#datacom').node().selectedOptions[0].text).toDateString());
+                if (choiceinit.includes('influxdb')) {
+                    // processResult = processResult_influxdb;
+                    db = "influxdb";
+                    realTimesetting(false, "influxdb", true);
+                } else {
+                    db = "nagios";
+                    // processResult = processResult_old;
+                    realTimesetting(false, undefined, true);
+                }
+                d3.json("data/" + d3.select('#datacom').node().value + ".json", function (error, data) {
+                    if (error) {
+                        M.toast({html: 'Local data does not exist, try to query from the internet!'});
+                        d3.json("https://media.githubusercontent.com/media/iDataVisualizationLab/HPCC/master/HiperView/data/" + choiceinit + ".json", function (error, data) {
+                            if (error) throw error;
+                            d3.select(".currentDate")
+                                .text("" + d3.timeParse("%d %b %Y")(d3.select('#datacom').select('[selected="selected"]').text()).toDateString());
+                            loadata(data)
+                        });
+                        return;
+                    }
+                    d3.select(".currentDate")
+                        .text("" + (new Date(data['timespan'][0]).toDateString()));
+                    loadata(data);
                 });
-                return;
+            }else{ // realtime
+                d3.select(".currentDate")
+                    .text("" + (new Date()).toDateString());
+                realTimesetting(true,choiceinit, true);
+                db = choiceinit;
+                requestService = eval('requestService'+choiceinit);
+                processResult = eval('processResult_'+choiceinit);
+                loadata({})
             }
-            loadata(data);
-        });
+        }
+    });
+        MetricController.graphicopt({width:365,height:365})
+            .div(d3.select('#RadarController'))
+            .tablediv(d3.select('#RadarController_Table'))
+            .axisSchema(serviceFullList)
+            .onChangeValue(onSchemaUpdate)
+            .onChangeFilterFunc(onfilterdata)
+            .init();
         function loadata(data){
             d3.select(".cover").select('h5').text('drawLegend...');
-            d3.select(".currentDate")
-                .text("" + d3.timeParse("%d %b %Y")(d3.select('#datacom').select('[selected="selected"]').text()).toDateString());
-            drawLegend(initialService, arrThresholds, arrColor, dif);
-            sampleS = data;
+            if(Object.keys(data).length){
+                drawLegend(initialService, arrThresholds, arrColor, dif);
+                data['timespan'] = data.timespan.map(d => new Date(d3.timeFormat('%a %b %d %X CDT %Y')(new Date(d.replace('Z', '')))));
+                sampleS = data;
+            }
             main();
             d3.select(".cover").select('h5').text('loading data...');
             addDatasetsOptions(); // Add these dataset to the select dropdown, at the end of this files
@@ -2169,28 +2269,27 @@ $( document ).ready(function() {
     // Spinner Stop ********************************************************************
 
 });
-function discovery(d){
-    d3.select(d).style('left','20px')
-        .classed("pulse",true)
-        .transition().delay(5000).duration(1000)
-        .style('left',null).on('end',function() {
-            d3.select(d).classed("pulse",false);
-    });
+let profile = {};
 
+function onfilterdata(schema) {
 }
-function switchTheme(){
-    if (this.value==="light"){
-        this.value = "dark";
-        this.querySelector('span').textContent = "Light";
-        d3.select('body').classed('light',false);
-        d3.select('.logoLink').select('img').attr('src',"https://idatavisualizationlab.github.io/HPCC/HiperView/images/TTUlogoWhite.png");
-        return;
+function onSchemaUpdate(schema){
+    serviceFullList.forEach(ser=>{
+        ser.angle = schema.axis[ser.text].angle();
+        ser.enable = schema.axis[ser.text].data.enable;
+    });
+    radarChartOptions.schema = serviceFullList;
+    // if (graphicControl.charType === "T-sne Chart")
+    TSneplot.schema(serviceFullList,firstTime);
+    // if (graphicControl.sumType === "Radar" || graphicControl.sumType === "RadarSummary") {
+    Radarplot.schema(serviceFullList,firstTime);
+    if (!firstTime) {
+        updateSummaryChartAll();
+        MetricController.drawSummary();
     }
-    this.value = "light";
-    this.querySelector('span').textContent = "Dark";
-    d3.select('body').classed('light',true);
-    d3.select('.logoLink').select('img').attr('src',"https://idatavisualizationlab.github.io/HPCC/HPCViz/images/TTUlogo.png");
-    return;
+    // }
+    if (db!=='csv')
+        SaveStore();
 }
 
 function onFinishInterval(data) {

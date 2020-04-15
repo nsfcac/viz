@@ -3,10 +3,18 @@
 	--secondary-color: rgba(255, 255, 255, 0.79);
 	--containBlack: #ffffff;
 	--slider: 0;
-	--sideNavwidth: 350px;
+	--sideNavwidth: 400px;
+	--colorMain2: #630016;
+	--colorMain2_light: #d8d8d8;
+	--buttonColor: #8a001a;
+	--buttonColor_sub: #ee6e73;
+	/*--buttonColor: #26a69a;*/
 }
-
-body { font: 12px Arial;
+html {
+	font-family: Arial, sans-serif;
+}
+body {
+	font: 12px Arial!important;
 	background-color: #353535;
 	color: white;
 }
@@ -95,9 +103,9 @@ a .ttu-logo{padding-left:2vw;padding-top:10px;padding-bottom:10px;margin-right:0
 
 
 #legendHolder {
-	position:absolute;
-	z-index: 2;
-	right:10px;
+	/*position:absolute;*/
+	/*z-index: 2;*/
+	/*right:10px;*/
 	border: 1px solid rgba(0,0,0, 0.2);
 	background-color: rgba(255,255,255, 0.75);
 	border-radius: 6px;
@@ -114,7 +122,7 @@ a .ttu-logo{padding-left:2vw;padding-top:10px;padding-bottom:10px;margin-right:0
 
 
 /* tooltip */
-#Summarynode, .d3-tip {
+#Summarynode, .d3-tip, #modelSelectionInformation {
 	z-index: 99;
 	line-height: 1;
 	padding: 10px;
@@ -122,6 +130,9 @@ a .ttu-logo{padding-left:2vw;padding-top:10px;padding-bottom:10px;margin-right:0
 	color: #000;
 	border: 1px solid rgba(0,0,0, 1);
 	border-radius: 10px;
+	-webkit-box-shadow: 11px 10px 21px -7px rgba(0,0,0,0.66);
+	-moz-box-shadow: 11px 10px 21px -7px rgba(0,0,0,0.66);
+	box-shadow: 11px 10px 21px -7px rgba(0,0,0,0.66);
 }
 
 /* Style northward tooltips differently */
@@ -154,10 +165,6 @@ a .ttu-logo{padding-left:2vw;padding-top:10px;padding-bottom:10px;margin-right:0
 	stroke-dasharray: 2,2;
 }
 
-label {
-	font-size: 12px;
-	color: currentColor;
-}
 
 /*table, th, td {*/
 	/*border: 1px solid #ccc;*/
@@ -345,7 +352,8 @@ label {
 	}
 }
 .menuBtn {
-	height: 30px;
+	/*height: 30px;*/
+	height: 1.5rem;
 
 }
 .menuIcon{
@@ -482,9 +490,12 @@ div.selection div,span {
 
 }
 .light #header {
-	background:  #f3f3f3;  /* fallback for old browsers */
-	background: -webkit-linear-gradient(to right, #f3f3f3, #ececec);  /* Chrome 10-25, Safari 5.1-6 */
-	background: linear-gradient(to right, #f3f3f3, #ececec); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+	/*background:  #f3f3f3;  !* fallback for old browsers *!*/
+	/*background: -webkit-linear-gradient(to right, #f3f3f3, #ececec);  !* Chrome 10-25, Safari 5.1-6 *!*/
+	/*background: linear-gradient(to right, #f3f3f3, #ececec); !* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ *!*/
+	background:  #8E0E00;  /* fallback for old browsers */
+	background: -webkit-linear-gradient(to left, #8E0E00, #a1a1a1 70%);  /* Chrome 10-25, Safari 5.1-6 */
+	background: linear-gradient(to left, #8E0E00, #a1a1a1 70%) /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
 }
 
 #header, #header a, #header .brand-logo{
@@ -505,7 +516,7 @@ div.selection div,span {
 	width:10em;
 }
 .light #header,.light #header a,.light #header .brand-logo {
-	color: #484848
+	color: #000000
 }
 
 .titletext {
@@ -580,7 +591,7 @@ nav ul li.active a{
 	color: #444444;
 }
 
-.sidenavs {
+.sidenavs{
 	height: 100%;
 	width: 0;
 	position: fixed;
@@ -590,9 +601,26 @@ nav ul li.active a{
 	background: rgba(0, 0, 0, 0.21);
 	overflow-x: hidden;
 	transition: 0.5s;
-	padding-top: 80px;
+	padding-top: 50px;
 }
-
+.sideHnavs {
+	width: 100%;
+	height: 0;
+	position: absolute;
+	z-index: 1;
+	top: 0;
+	left: 0;
+	background: rgba(0, 0, 0, 0.21);
+	overflow-x: hidden;
+	transition: 0.5s;
+	-webkit-box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.12), 0 1px 5px 0 rgba(0, 0, 0, 0.2);
+	box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.12), 0 1px 5px 0 rgba(0, 0, 0, 0.2);
+	background-color: #dddddd;
+}
+.sidehIn.sideHnavs {
+	height: var(--sideNavwidth);
+	transform: translateY(-100%);
+}
 .sideIn.sidenavs {
 	width: var(--sideNavwidth);
 }
@@ -603,7 +631,10 @@ nav ul li.active a{
 .sideIn #scatterzone {
 	left: var(--sideNavwidth);
 }
-
+.sidehIn#Maincontent {
+	position: relative;
+	margin-top: var(--sideNavwidth);
+}
 .sidenavs a {
 	padding: 8px 8px 8px 32px;
 	text-decoration: none;
@@ -630,9 +661,20 @@ nav ul li.active a{
 	top: 50%;
 	left:-40px;
 }
-.sideIn .closebtn{
+.closebtn.horizontal{
+	position: absolute;
+	left: 50%;
+	top:-40px;
+}
+.sideIn .closebtn:not(.horizontal){
 	top: 50%;
 	left: calc(var(--sideNavwidth) - 20px);
+	transition: 0.5s;
+}
+
+.sidehIn .closebtn.horizontal{
+	left: 50%;
+	top: -20px;
 	transition: 0.5s;
 }
 
@@ -641,7 +683,17 @@ nav ul li.active a{
 	top: 50%;
 	left:-30px;
 }
-
+.openbtn.discovery {
+	left: 20px;
+}
+.horizontal .openbtn{
+	position: absolute;
+	left: 50%;
+	top:-30px;
+}
+.horizontal .openbtn.discovery{
+	top:20px;
+}
 .overlaySide{
 	margin: 0;
 	padding: 0;
@@ -649,17 +701,30 @@ nav ul li.active a{
 	top: 0px;
 	left: -20px;
 	background-color: rgba(0,0,0,0);
-	z-index: 999;
+	z-index: 1000;
 	width: 40px;
 	height: 100%;
 }
-
-.overlaySide:hover .openbtn, .overlaySide:active .openbtn{
-	left: 20px;
+.overlaySide.horizontal {
+	position: absolute;
+	top: -20px;
+	left: 0px;
+	height: 40px;
+	width: 100%;
 }
 
-.sideIn .overlaySide {
+.overlaySide:not(.horizontal):hover .openbtn, .overlaySide:not(.horizontal):active .openbtn{
+	left: 20px;
+}
+.overlaySide.horizontal:hover .openbtn, .overlaySide.horizontal:active .openbtn{
+	top: 20px;
+}
+.sideIn .overlaySide:not(.horizontal) {
 	left:-80px;
+}
+
+.sidehIn .overlaySide.horizontal {
+	top:-80px;
 }
 
 .controls {
@@ -790,6 +855,10 @@ p.divider {
 	padding-right: 10px;
 	margin-top: 0;
 }
+.top10DIV .collection td {
+	padding-left: 5px;
+	padding-right: 5px;
+}
 .alignRight {
 	text-align: right;
 }
@@ -804,6 +873,11 @@ p.divider {
 	border-radius: 0;
 	padding: 0px 10px
 }
+
+table thead th {
+	cursor: default ;
+}
+
 .displayNone {
 	display: none;
 }
@@ -860,23 +934,27 @@ p.divider {
 	stroke: #3fc151;
 }
 
-.user_timeline line.timeBoxRunning {
+.user_timeline line.timeBoxRunning, path.timeBoxRunning {
 	stroke: #3fc151;
 	stroke-width: 1px;
 	opacity: 0.6;
 }
 
-.user_timeline line.submitTime {
+.user_timeline line.submitTime, path.submitTime {
 	stroke: #ffa328;
 }
 
 .user_timeline line.timeBox {
-	stroke: black;
+	stroke: #d68924;
 	stroke-width: 1px;
 	opacity: 0.6;
 }
-
-
+.user_timeline .gaxis .tick {
+	stroke-dasharray: 2;
+}
+.user_timeline .gaxis .tick:last-child {
+	opacity: 0.5;
+}
 #search_User {
 	border: #7b7b7b solid 0.5px;
 	font-size: 12px;
@@ -916,7 +994,7 @@ p.divider {
 }
 
 path.outlying {
-	stroke: #8a001a !important;
+	stroke: var(--colorMain2) !important;
 }
 #tsnezone {
 	position: absolute;
@@ -954,3 +1032,141 @@ path.outlying {
 .menuBtn.seperate[value='true']:before {
 	content:'Collapse'
 }
+.angleValue {
+	display: none;
+}
+.axis.active .angleValue{
+	display: block;
+}
+
+.flip_h {
+	-moz-transform: scale(1, -1);
+	-webkit-transform: scale(1, -1);
+	-o-transform: scale(1, -1);
+	-ms-transform: scale(1, -1);
+	transform: scale(1, -1);
+}
+
+.dataTables_wrapper .dataTables_filter input{
+	width: calc(100% - 80px);
+	margin-left: 0.5em;
+	left: auto;
+	right: auto;
+	padding-left: 10px;
+}
+.dataTables_filter {
+	width: 50%;
+}
+.dataTables_length{
+	padding-top: 2px;
+}
+.dataTables_filter input{
+	height: 2rem;
+}
+.dataTables_paginate {
+	display: flex;
+}
+.dataTable input {
+	color: currentColor;
+}
+/*input[type=search]:not(.browser-default) {*/
+	/*font-size: unset;*/
+	/*border-radius: 10px;*/
+	/*border: 1px solid #666666;*/
+/*}*/
+.dataTables_wrapper .dataTables_filter{
+	padding: 0;
+	padding-bottom: 0.5rem;
+}
+.dataTable {
+	color: black;
+}
+.dataTable input[type=number]{
+	height: 1rem;
+	font-size: unset;
+	border-radius: 2px;
+	border: 1px solid #f2f2f2;
+	background-color: white;
+	text-align: right;
+	margin: unset;
+}
+.dataTable input:focus{
+	border-bottom: unset;
+}
+.dataTable span {
+	padding: unset;
+}
+.dataTable a {
+	line-height: 1rem;
+	padding: 2px 0.25rem;
+}
+.dataTable a.disable-field {
+	/*color: #26a69a;*/
+	color: var(--buttonColor);
+}
+.dataTable .fieldDisable {
+	opacity: .4;
+	pointer-events: none;
+}
+.fieldDisable i {
+	color: #b7b7b7;
+}
+.fieldDisable .toggleDisable i {
+	pointer-events: all;
+}
+.fieldDisable :hover .toggleDisable i{
+	animation:2s linear bounce;
+	animation-iteration-count:infinite
+}
+.axis.disable {
+	display: none;
+}
+
+table.dataTable thead {
+	background-color: var(--colorMain2_light);
+	color: black;
+}
+
+.light table.dataTable thead {
+	background-color: #ccc9c9;
+	/*background-color: var(--colorMain2_light);*/
+}
+
+table.dataTable.hover tbody tr:hover, table.dataTable.display tbody tr:hover {
+	/*background-color: rgba(var(--colorMain2),0.5);*/
+	background-color: rgba(212, 41, 0, 0.2);
+}
+
+table.dataTable.hover tbody tr:hover.selected, table.dataTable.display tbody tr:hover.selected {
+	/*background-color: rgba(var(--colorMain2),0.5);*/
+	background-color: rgba(212, 41, 0, 0.2);
+}
+
+table.dataTable td {
+	padding: 2px;
+	line-height: 1rem;
+}
+.radarController.radarPlot {
+	background-color: white;
+	border-radius: 10px;
+}
+path {
+	stroke-linejoin: round;
+}
+
+#mySidenav .row {
+	margin-bottom: 10px;
+}
+
+.angle {
+	width: 30px;
+	padding-left: 10px;
+	padding-right: 10px;
+}.btngroup {
+	width: 5px;
+}
+.clusterPath {
+	opacity: 0.2
+}
+
+

@@ -66,34 +66,37 @@ function hue(hhh) {
         handle.attr("cx", 0);
     else
         handle.attr("cx", xx);
-  
+
     if (firstTime==false){
         for (var name in hostResults) {
             var r = hostResults[name];
             // Process the array of historical temperatures
-            var maxIncrease = 0;
-            var preTemp1 = 0;
-            var preTemp2 = 0;
-            for (var i = 0; i < r.arr.length; i++) {
-                var a = processData(r.arr[i].data.service.plugin_output,selectedService);
-                var temp1 = a[0];
-                var temp2 = a[1];
-                if (i>=1){
-                    var dif1 = Math.abs(temp1-preTemp1);
-                    var dif2 = Math.abs(temp2-preTemp2);
-                    var max = Math.max(dif1,dif2);
-                    if (max>maxIncrease)
-                        maxIncrease=max;
+            if (r.arr){
+                var maxIncrease = 0;
+                var preTemp1 = 0;
+                var preTemp2 = 0;
+                for (var i = 0; i < r.arr.length; i++) {
+                    // var a = processData(r.arr[i].data.service.plugin_output,selectedService);
+                    var a = r.arr[i];
+                    var temp1 = a[0];
+                    var temp2 = a[1];
+                    if (i>=1){
+                        var dif1 = Math.abs(temp1-preTemp1);
+                        var dif2 = Math.abs(temp2-preTemp2);
+                        var max = Math.max(dif1,dif2);
+                        if (max>maxIncrease)
+                            maxIncrease=max;
+                    }
+                    preTemp1 = temp1;
+                    preTemp2 = temp2;
                 }
-                preTemp1 = temp1;
-                preTemp2 = temp2;
-            }
-            var sliderValue = xx/3;  // based on the range above
-            if (maxIncrease>sliderValue){
-                //console.log(name+" "+maxIncrease +" "+xx/3);
-            }
-            else{
-                svg.selectAll("."+name).attr("fill-opacity",0);
+                var sliderValue = xx/3;  // based on the range above
+                if (maxIncrease>sliderValue){
+                    //console.log(name+" "+maxIncrease +" "+xx/3);
+                }
+                else{
+                    svg.selectAll('.'+fixName2Class(name)).attr("fill-opacity",0);
+                }
             }
         }
     }
@@ -110,7 +113,7 @@ function drawLegend(s,arrThresholds, arrColor, dif){
         barW =8;
     var xScale = d3.scaleLinear()
         .domain([arrThresholds[0], arrThresholds[arrThresholds.length-1]]) // input
-        .range([x, x+250]); // output
+        .range([x, x+200]); // output
     var arr2 = [];
     var xStep = dif/10.;
     for (var i=arrThresholds[0]; i<arrThresholds[arrThresholds.length-1];i=i+xStep){
@@ -155,7 +158,7 @@ function drawLegend(s,arrThresholds, arrColor, dif){
             else
                 return Math.round(d);
         });
-    
+
     svgLengend.selectAll(".legendText2").remove();
     svgLengend.selectAll(".legendText2")
         .data(arrThresholds)
@@ -178,7 +181,7 @@ function drawLegend(s,arrThresholds, arrColor, dif){
                     return "";
                 else if (selectedService==serviceList[2] && i==1)   // No lower bound for Memory usage
                     return "";
-                else 
+                else
                     return "Critical";
             }
             else if (i==3)
@@ -186,7 +189,7 @@ function drawLegend(s,arrThresholds, arrColor, dif){
             else
                 return "";
         });
-    
+
     svgLengend.selectAll(".legendText1").remove();
     svgLengend.append("text")
         .attr("class", "legendText1")
@@ -247,233 +250,60 @@ function areaChart(){
 }
 
 function saveResults(){
-    var filename = "service"+d3.timeFormat("%a%d%b_%H%M")(new Date())+".json";
+    var filename = "service"+d3.timeFormat("%a%d%b_%H%M")(new Date());
     var type = "json";
-    var str = JSON.stringify(hostResults);
 
-    
+    var clone_hostResults = JSON.parse( JSON.stringify(hostResults));
+    var jobarr = {};
+    var validJobInfo = false;
+    hosts.forEach(h=>{
+        if (clone_hostResults[h.name].arrJob_scheduling&&clone_hostResults[h.name].arrJob_scheduling.length) {
+            jobarr[h.name] = clone_hostResults[h.name].arrJob_scheduling;
+            jobarr[h.name].reduce((o, n) => validJobInfo = validJobInfo || n[0] != undefined);
+            delete clone_hostResults[h.name].arrJob_scheduling;
+        }
+        delete clone_hostResults[h.name].arr;
+    });
+
+    clone_hostResults['timespan'] = clone_hostResults['timespan'].map(d=>new Date(d).toISOString())
+
+    var str = JSON.stringify(clone_hostResults);
+
+
     var file = new Blob([str], {type: type});
     if (window.navigator.msSaveOrOpenBlob) // IE10+
-        window.navigator.msSaveOrOpenBlob(file, filename);
+        window.navigator.msSaveOrOpenBlob(file, filename+'.'+type);
     else { // Others
         var a = document.createElement("a"),
                 url = URL.createObjectURL(file);
         a.href = url;
-        a.download = filename;
+        a.download = filename+'.'+type;
         document.body.appendChild(a);
         a.click();
         setTimeout(function() {
             document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);  
-        }, 0); 
+            window.URL.revokeObjectURL(url);
+        }, 0);
     }
+    if (validJobInfo){
+        var str = JSON.stringify(jobarr);
 
-    /*
-    // Save results for Project 1
-    var filename = "HPCC_Project1.json";
-    var type = "json";
-    var data = {};
-   for (var att in sampleS){
-        data[att]={};
-        data[att].arrTemperatureCPU1=[];
-        data[att].arrTemperatureCPU2=[];
-        data[att].arrCPU_load=[];
-        data[att].arrFans_speed1=[];
-        data[att].arrFans_speed2=[];
-        data[att].arrMemory_usage=[];
 
-        var item = sampleS[att];
-        for(var i=0;i<item.arr.length;i++){
-            var str = item.arr[i].data.service.plugin_output;
-            if (str=="UNKNOWN-Plugin was unable to determine the status for the host CPU temperatures! HTTP_STATUS Code:000"){
-                data[att].arrTemperatureCPU1.push(null);
-                data[att].arrTemperatureCPU2.push(null);
-            }
-            else{
-                var a = processData(str, serviceList[0]);
-                data[att].arrTemperatureCPU1.push(a[0]);
-                data[att].arrTemperatureCPU2.push(a[1]);
-            }
-            
-            var str2 = item.arrCPU_load[i].data.service.plugin_output;
-            var b2 =  +str2.split("CPU Load: ")[1];
-            data[att].arrCPU_load.push(b2);
-                       
-            var str3 = item.arrMemory_usage[i].data.service.plugin_output;
-            //console.log(att+" "+str3);
-            if (str3.indexOf("syntax error")>=0 ){
-                data[att].arrMemory_usage.push(null);
-            }
-            else{
-                var b3 =  str3.split("Usage Percentage = ")[1];
-                var c3 =  +b3.split(" :: Total Memory")[0];
-                data[att].arrMemory_usage.push(c3);
-            }
-
-            var str4 = item.arrFans_health[i].data.service.plugin_output;
-            if (str4.indexOf("UNKNOWN")>=0 || str4.indexOf("No output on stdout) stderr")>=0 
-                || str4.indexOf("Service check timed out")>=0){
-                data[att].arrFans_speed1.push(null);
-                data[att].arrFans_speed2.push(null);  
-            }  
-            else{  
-                var arr4 =  str4.split(" RPM ");
-                var fan1 = +arr4[0].split("FAN_1 ")[1];
-                var fan2 = +arr4[1].split("FAN_2 ")[1];
-                data[att].arrFans_speed1.push(fan1);
-                data[att].arrFans_speed2.push(fan2);  
-            }
-        }
-    }
-
-    var str = JSON.stringify(data);
-    var file = new Blob([str], {type: type});
-    if (window.navigator.msSaveOrOpenBlob) // IE10+
-        window.navigator.msSaveOrOpenBlob(file, filename);
-    else { // Others
-        var a = document.createElement("a"),
+        var file = new Blob([str], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename+'_job'+'.'+type);
+        else { // Others
+            var a = document.createElement("a"),
                 url = URL.createObjectURL(file);
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function() {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);  
-        }, 0); 
-    }*/
-
-
-    // Save results for Outliagnostics ***************************
-    var filename = "HPCC_scagnostics.json";
-    var type = "json";
-
-    var numnerOfYear = 100000;
-    for (var att in sampleS){
-        var item = sampleS[att];
-        if (item.arrTemperature.length<numnerOfYear){
-            numnerOfYear = item.arrTemperature.length;
+            a.href = url;
+            a.download = filename+'_job'+'.'+type;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
         }
-    }   
-
-    var dataS = {};
-    dataS.Scagnostics= ["Outlying", "Skewed", "Clumpy", "Sparse", "Striated", "Convex", "Skinny", "Stringy", "Monotonic"];
-    dataS.Variables = ["var1", "var2"];
-    dataS.Countries = [];
-    for (var att in sampleS){
-        dataS.Countries.push(att);
-    }    
-    dataS.CountriesData ={};
-    for (var att in sampleS){
-        dataS.CountriesData[att]=[];
-       
-        var item = sampleS[att];
-        for(var i=0;i<numnerOfYear;i++){
-            var str = item.arrTemperature[i].data.service.plugin_output;
-            var obj = {};
-            if (str=="UNKNOWN-Plugin was unable to determine the status for the host CPU temperatures! HTTP_STATUS Code:000"){
-                obj.v0=null;
-            }
-            else{
-                var a = processData(str,serviceList[0]);
-                if (a[1]<0)
-                    obj.v0 = null;
-                obj.v0 = a[1];
-            }
-                         
-            var str4 = item.arrFans_health[i].data.service.plugin_output;
-            if (str4.indexOf("(No output on stdout)")>=0 
-                || str4.indexOf("UNKNOWN")>=0  
-                || str4.indexOf("syntax error")>=0 ){
-                obj.v1=null;
-            }
-            else{
-                var c3 =  processData(str4,serviceList[3]);
-                if (c3[1]<0)
-                     obj.v1 = null;
-                obj.v1=c3[1];
-            }
-            obj.Outlying = 0;
-            obj.year = i;
-            dataS.CountriesData[att].push(obj);
-        }
-    }
-    // Standardize data ***************************************************************
-    var minV0 = 100000;
-    var minV1 = 100000;
-    var maxV0 = 0;
-    var maxV1 = 0;
-    for (var att in  dataS.CountriesData){
-        var hostArray = dataS.CountriesData[att];
-        for(var i=0;i<hostArray.length;i++){
-            var v0 = hostArray[i].v0;
-            var v1 = hostArray[i].v1;
-            if (v0 != null){
-                if (v0<minV0)
-                    minV0 = v0;
-                if (v0>maxV0)
-                    maxV0 = v0;
-            }
-            if (v1 != null){
-                if (v1<minV1)
-                    minV1 = v1;
-                if (v1>maxV1)
-                    maxV1 = v1;
-            }
-        }    
-    }
-    for (var att in  dataS.CountriesData){
-        var hostArray = dataS.CountriesData[att];
-        for(var i=0;i<hostArray.length;i++){
-            var v0 = hostArray[i].v0;
-            var v1 = hostArray[i].v1;
-            if (v0 != null){
-                hostArray[i].s0 = (hostArray[i].v0-minV0)/(maxV0-minV0)
-            }
-            else{
-                hostArray[i].s0=null;
-            }
-            if (v1 != null){
-                hostArray[i].s1= (hostArray[i].v1-minV1)/(maxV1-minV1);
-            }
-            else{
-                hostArray[i].s1=null;
-            }
-        }    
-    }
-
-    dataS.YearsData = [];
-    for (var y=0; y<numnerOfYear; y++){
-        var obj = {};
-        obj.s0 = [];
-        obj.s1 = [];
-        obj.Scagnostics0 = [0, 0, 0, 0, 0, 0, 0, 0, 0]; 
-        for (var att in  dataS.CountriesData){
-            var hostArray = dataS.CountriesData[att];
-            var v0 = hostArray[y].s0;
-            var v1 = hostArray[y].s1;
-            obj.s0.push(v0);
-            obj.s1.push(v1);
-        }
-        dataS.YearsData.push(obj);
-    }
-    
-
-    var str = JSON.stringify(dataS);
-    var file = new Blob([str], {type: type});
-    if (window.navigator.msSaveOrOpenBlob) // IE10+
-        window.navigator.msSaveOrOpenBlob(file, filename);
-    else { // Others
-        var a = document.createElement("a"),
-                url = URL.createObjectURL(file);
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function() {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);  
-        }, 0); 
     }
 }
 
@@ -578,4 +408,750 @@ function rasterize(svg,isLight) {
     };
     image.src = URL.createObjectURL(serialize(svg,isLight));
     return promise;
+}
+function creatContain(contain,colorScaleList,colorArr,callback){
+    const  n = colorScaleList.n;
+    const ul = contain.append('ul').style('width','100%');
+    const colorListitems = ul.selectAll('li').data(colorArr)
+        .enter().append('li')
+        .attr('class','colorScale div row s12 valign-wrapper');
+    colorListitems.append('div')
+        .attr('class','col s4 colorscale-label')
+        // .attr('class','colorscale-label')
+        .text(d=>d.label)
+    const colorpalette = colorListitems.append('div')
+        .attr('class','col s7 colorscale-palette-container')
+        // .attr('class','colorscale-palette-container')
+        .append('div')
+        .attr('class','colorscale-block')
+        .on('click',callback)
+        .call(createColorbox);
+
+}
+function createColorbox(g) {
+
+    const boxs = g.selectAll('div.colorscale-swatch').data(function(d)
+    {
+        const name = d.val;
+        let colors;
+        if (d.type==='d3') {
+            colors = colorScaleList.d3colorChosefunc(name)
+        }else{
+            colors = colorScaleList.customFunc(name);
+        }
+
+        if (d.invert)
+            colors = colors.reverse();
+        (this.parentNode.__data__||this.__data__).arrColor = colors;
+
+        let colors_display;
+        if (d.type==='d3') {
+            colors_display = colorScaleList.d3colorChosefunc(name,50)
+        }else{
+            colors_display = colorScaleList.customFunc(name,undefined,50);
+        }
+
+        if (d.invert)
+            colors_display = colors_display.reverse();
+
+        return colors_display;
+    });
+    boxs.exit().remove();
+    boxs.enter().append('div')
+        .attr('class','colorscale-swatch')
+        .merge(boxs)
+        .styles(function (d,i){
+            const n = 50;
+            return {
+                'background-color': d,
+                'width': `${(1/n)*100}%`
+            }})
+}
+function createGradient(rg,limitcolor,arrColor,opacitycallback) {
+    const legntharrColor = arrColor.length - 1;
+    opacitycallback = opacitycallback||((i)=>i / legntharrColor);
+    rg.selectAll('stop').remove();
+    rg.append("stop")
+        .attr("offset", "0%")
+        .attr("stop-opacity", limitcolor?0:opacitycallback(0));
+    rg.append("stop")
+        .attr("offset", (limitcolor - 1) / legntharrColor * 100 + "%")
+        .attr("stop-color", arrColor[limitcolor])
+        .attr("stop-opacity", limitcolor?0:opacitycallback(0));
+    arrColor.forEach((d, i) => {
+        if (i > (limitcolor - 1)) {
+            rg.append("stop")
+                .attr("offset", i / legntharrColor * 100 + "%")
+                .attr("stop-color", d)
+                .attr("stop-opacity", opacitycallback(i));
+            if (i != legntharrColor)
+                rg.append("stop")
+                    .attr("offset", (i + 1) / legntharrColor * 100 + "%")
+                    .attr("stop-color", arrColor[i + 1])
+                    .attr("stop-opacity", opacitycallback(i));
+        }
+    });
+}
+
+function createLinearGradient(direction,rg,limitcolor,arrColor,opacitycallback) {
+    if (direction=='v')
+        rg.attr('x1', '0%')
+            .attr('y1', '100%')
+            .attr('x2', '0%')
+            .attr('y2', '0%')
+    const legntharrColor = arrColor.length - 1;
+    opacitycallback = opacitycallback||((i)=>i / legntharrColor);
+    rg.selectAll('stop').remove();
+    rg.append("stop")
+        .attr("offset", "0%")
+        .attr("stop-opacity", limitcolor?0:opacitycallback(0));
+    arrColor.forEach((d, i) => {
+        if (i > (limitcolor - 1)) {
+            rg.append("stop")
+                .attr("offset", i / legntharrColor * 100 + "%")
+                .attr("stop-color", d)
+                .attr("stop-opacity", opacitycallback(i));
+        }
+    });
+}
+function UpdateGradient(svg) { // using global arrcolor
+    let rdef = svg.select('defs.gradient');
+    let rg,rg2,lg;
+    if (rdef.empty()){
+        rdef = svg.append("defs").attr('class','gradient');
+        rg = rdef
+            .append("radialGradient")
+            .attr("id", "rGradient");
+        rg2 = rdef.append("radialGradient")
+            .attr("id", "rGradient2");
+        lg = rdef.append("linearGradient")
+            .attr("id", "lradient");
+    }
+    else {
+        rg = rdef.select('#rGradient');
+        rg2 = rdef.select('#rGradient2');
+        lg = rdef.select('#lradient');
+    }
+    let opacityGradient =undefined
+    // const rangeop = d3.range(0,arrColor.length);
+    // const opas = d3.scaleLinear().domain([1,arrColor.length/2-1]).range([1,0.5]);
+    // let opacityGradient = d3.scaleLinear().domain(rangeop).range(rangeop.map(d=>opas(d>(arrColor.length/2-1)?(arrColor.length-1-d):d)));
+    createGradient(rg,4,arrColor,opacityGradient);
+    createGradient(rg2,0,arrColor,opacityGradient);
+    createLinearGradient('v',lg,0,arrColor,opacityGradient);
+
+}
+function fixName2Class(s) {
+    return 'h'+s.replace(/ |#|\./gi,''); //avoid . and number format
+}
+function positiveAngle(angle){
+    return angle>0? angle: (angle+Math.PI*2);
+}
+function downloadProfile(event){
+    $('#savename_profile').val("profile"+d3.timeFormat("%a%d%b_%H%M")(new Date()));
+}
+function onSaveProfile (){
+    var filename = $('#savename_profile').val()+".json";
+    var type = "json";
+    var str = JSON.stringify(conf);
+    var file = new Blob([str], {type: type});
+    if (window.navigator.msSaveOrOpenBlob) // IE10+
+        window.navigator.msSaveOrOpenBlob(file, filename);
+    else { // Others
+        var a = document.createElement("a"),
+            url = URL.createObjectURL(file);
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+    }
+}
+function uploadProfile(){
+    $('#profile_input_file').trigger( "click" );
+    $('#profile_input_file').on('change', (evt) => {
+        var f = evt.target.files[0];
+        var reader = new FileReader();
+        reader.onload = (function(theFile) {
+            return function(e) {
+                // Render thumbnail.
+                d3.json(e.target.result,function (error, data) {
+                    if (error){
+                    }else{
+                        if (data.serviceLists[0].sub[0].angle ===undefined)
+                            throw "wrong file";
+                        conf = data;
+                        variablesNames.forEach(d=>{ window[d] = conf[d]});
+                        // relink object
+                        serviceFullList = serviceLists2serviceFullList(serviceLists);
+                        MetricController.axisSchema(serviceFullList).update();
+                    }
+                })
+                // span.innerHTML = ['<img class="thumb" src="', e.target.result,
+                //     '" title="', escape(theFile.name), '"/>'].join('');
+                // document.getElementById('list').insertBefore(span, null);
+            };
+        })(f);
+
+        // Read in the image file as a data URL.
+        reader.readAsDataURL(f);
+    })
+}
+
+// ui part
+function openNav(e) {
+    let target = "#mySidenav";
+    let source = "#Maincontent";
+    let customclass = "sideIn";
+    if(e) {
+        target = d3.select(e).attr('data-target') ||target;
+        source = d3.select(e).attr('data-source') || source;
+        customclass = d3.select(e).attr('data-class') ||customclass;
+    }
+    d3.select(target).classed(customclass,true).dispatch('change');
+    d3.select(source).classed(customclass,true);
+    // _.delay(resetSize, 500);
+}
+
+function closeNav(e) {
+    let target = "#mySidenav";
+    let source = "#Maincontent";
+    let openbtn = "#sideNavbtn";
+    let customclass = "sideIn";
+    if(e) {
+        target = d3.select(e).attr('data-target') ||target;
+        source = d3.select(e).attr('data-source') || source;
+        openbtn = d3.select(e).attr('data-link')|| openbtn;
+        customclass = d3.select(e).attr('data-class') ||customclass;
+    }
+    d3.select(target).classed(customclass,false);
+    d3.select(source).classed(customclass,false);
+    discovery(openbtn);
+    // _.delay(resetSize, 500);
+}
+
+function changeRadarColor(d) {
+    profile.radarcolor = d.val;
+    d3.select('#RadarColor')
+        .select('.collapsible-header .colorscale-block').datum(d)
+        .call(createColorbox);
+    arrColor=d.arrColor;
+    updateColorScale();
+    UpdateGradient(svg);
+}
+let colorTemperature;
+function updateColorScale(){
+    let colorLength = arrColor.length-1;
+    var dif = 1 / (TsnePlotopt.radaropt.levels-2);
+    var right = 1 + dif;
+    let arrThresholds = [-dif];
+    for (var i=0;i<colorLength-1;i++)
+        arrThresholds.push(i*dif);
+    arrThresholds.push(right);
+    colorTemperature = d3.scaleLinear()
+        .domain(arrThresholds)
+        .range(arrColor)
+        .interpolate(d3.interpolateHcl); //interpolateHsl interpolateHcl interpolateRgb
+}
+function onClickRadarColor (d){
+    changeRadarColor(d);
+    if (jobMap)
+        jobMap.color(colorTemperature);
+    MetricController.updatecolor(arrColor);
+    TSneplot.RadarColor(d);
+}
+
+function discovery(d){
+    d3.select(d).classed('discovery',true)
+        .classed("pulse",true)
+        .transition().delay(5000)
+        .on('end',function() {
+            d3.select(d).classed("discovery",false).classed("pulse",false);
+        });
+
+}
+function switchTheme(){
+    if (this.getAttribute('value')==="light"){
+        this.setAttribute('value', "dark");
+        this.querySelector('span').textContent = "Light";
+        d3.select('body').classed('light',false);
+        d3.select('.logoLink').select('img').attr('src',"https://idatavisualizationlab.github.io/HPCC/HiperView/images/TTUlogoWhite.png");
+        return;
+    }
+    this.setAttribute('value', "light");
+    this.querySelector('span').textContent = "Dark";
+    d3.select('body').classed('light',true);
+    d3.select('.logoLink').select('img').attr('src',"https://idatavisualizationlab.github.io/HPCC/HPCViz/images/TTUlogo.png");
+    return;
+}
+function addDatasetsOptions() {
+    let select= d3.select("#datasetsSelect")
+        .selectAll('li')
+        .data(serviceList_selected);
+    select.exit().remove();
+    let nselect = select
+        .enter()
+        .append('li')
+        .attr('class','collection-item avatar valign-wrapper');
+
+    nselect.append('img')
+        .attr('class',"circle");
+    nselect.append('h6').attr('class','title');
+    nselect.on("click",function(d){loadNewData(d.text)});
+
+    select = nselect.merge(select).attr('value',d=>d.text);
+    select.select('img').attr('src',d=>srcpath+"images/"+d.text+".png").on('error',function(d){handlemissingimage(this,d.text)});
+    select.select('h6').text(d=>d.text);
+
+    document.getElementById('datasetsSelect').value = serviceList.find(d=>d===initialService)||serviceList[0];  //************************************************
+    loadNewData(document.getElementById('datasetsSelect').value,true)
+    // selectedService = document.getElementById("datasetsSelect").value;
+    const trig = d3.select("#datasetsSelectTrigger");
+    trig.select('img').attr('src',srcpath+"images/"+selectedService+".png").on('error',function(){handlemissingimage(this,selectedService)});
+    trig.select('span').text(selectedService);
+
+    //loadData();
+}
+function handlemissingimage(node,selectedService){
+    d3.select(node).on('error',null);
+    const keys =Object.keys(basic_service).map(k=>extractWordsCollection(getTermsArrayCollection(k),selectedService,k)).filter(d=>Object.keys(d).length);
+
+    if (keys.length)
+        node.src = srcpath+"images/"+Object.keys(keys[0])[0]+".png";
+    else
+        node.src = srcpath+"images/TTUlogo.png";
+    d3.select(node).attr('src',node.src)
+    console.log(node.src)
+}
+
+let srcpath ='';
+
+function concaveHull() {
+    let calcDist = stdevDist
+    let padding = 0
+    let voronoi
+    const dist = (a, b) => ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+
+    function stdevDist(voronoi) {
+        const sides = new Array(voronoi.length * 3)
+        voronoi.forEach((d, i) => {
+            sides[i * 3 + 0] = dist(d[0], d[1])
+            sides[i * 3 + 1] = dist(d[0], d[2])
+            sides[i * 3 + 2] = dist(d[1], d[2])
+        })
+        return d3.mean(sides) + d3.deviation(sides)
+    }
+
+    function concaveHull(vertices) {
+        voronoi = d3.voronoi().triangles(vertices)
+        const long = calcDist(voronoi)
+        const mesh = voronoi.filter(d => dist(d[0], d[1]) < long && dist(d[0], d[2]) < long && dist(d[1], d[2]) < long)
+        const counts = {}
+        const edges = {}
+        let r
+        const result = []
+
+        // Traverse the edges of all triangles and discard any edges that appear twice.
+        mesh.forEach(triangle => {
+            for (let i = 0; i < 3; i++) {
+                const edge = [triangle[i], triangle[(i + 1) % 3]].sort(ascendingCoords).map(String);
+                (edges[edge[0]] = (edges[edge[0]] || [])).push(edge[1]);
+                (edges[edge[1]] = (edges[edge[1]] || [])).push(edge[0]);
+                var k = edge.join(":")
+                if (counts[k]) delete counts[k]
+                else counts[k] = 1
+            }
+        })
+
+        while (true) {
+            let k = null
+            // Pick an arbitrary starting point on a boundary.
+            for (k in counts) break
+            if (k === null) break
+            result.push(r = k.split(":").map(d => d.split(",").map(Number)))
+            delete counts[k]
+            let q = r[1]
+            while (q[0] !== r[0][0] || q[1] !== r[0][1]) {
+                const p = q
+                const qs = edges[p.join(",")]
+                const n = qs.length
+                for (let i = 0; i < n; i++) {
+                    q = qs[i].split(",").map(Number)
+                    const edge = [p, q].sort(ascendingCoords).join(":")
+                    if(counts[edge]) {
+                        delete counts[edge]
+                        r.push(q)
+                        break
+                    }
+                }
+            }
+        }
+
+        return padding !== 0 ? pad(result, padding) : result
+    }
+
+    function pad(bounds, amount) {
+        return bounds.map(bound => {
+            // http://forums.esri.com/Thread.asp?c=2&f=1718&t=174277
+            const handedness = bound.map((p, i) => {
+                const pm = bound[i === 0 ? bound.length - 1 : i - 1]
+                return (p[0] - pm[0]) * (p[1] + pm[1]) * 0.5
+            }).reduce((a, b) => a + b) > 0 ? -1 : 1
+
+            return bound.map((p, i) => {
+                const normal = rotate(tan(p, bound[i === 0 ? bound.length - 2 : i - 1]), 90 * handedness)
+                return [p[0] + normal.x * amount, p[1] + normal.y * amount]
+            })
+        })
+    }
+
+    function tan(a, b) {
+        const vec = {x: b[0] - a[0], y: b[1] - a[1]}
+        const mag = Math.sqrt(vec.x * vec.x + vec.y * vec.y)
+        vec.x /= mag
+        vec.y /= mag
+        return vec
+    }
+
+    function rotate(vec, angle) {
+        angle *= Math.PI / 180
+        return {
+            x: vec.x * Math.cos(angle) - vec.y * Math.sin(angle),
+            y: vec.x * Math.sin(angle) + vec.y * Math.cos(angle)
+        }
+    }
+
+    const ascendingCoords = (a, b) => a[0] === b[0] ? b[1] - a[1] : b[0] - a[0]
+
+    concaveHull.padding = function (newPadding) {
+        if (!arguments.length) return padding
+        padding = newPadding
+        return concaveHull
+    }
+
+    concaveHull.distance = function (newDist) {
+        if (!arguments.length) return calcDist
+        calcDist = typeof newDist === "number" ? () => newDist : newDist
+        return concaveHull
+    }
+
+    return concaveHull
+};
+function truncate (text,endsymbol) {
+    text.each(function() {
+        var text = d3.select(this);
+        var words = text.text().trim().split(/\s+/);
+        var ellipsis = text.text('').append('tspan').attr('class', 'elip').text('...'+(endsymbol||''));
+        var width = parseFloat(text.attr('width')) - ellipsis.node().getComputedTextLength();
+        var numWords = words.length;
+
+        var tspan = text.insert('tspan', ':first-child').text(words.join(' '));
+
+        // Try the whole line
+        // While it's too long, and we have words left, keep removing words
+        let old_words ='';
+        while (tspan.node().getComputedTextLength() > width && words.length) {
+            old_words = words.pop();
+            tspan.text(words.join(' '));
+        }
+
+        if (words.length === numWords) {
+            ellipsis.remove();
+            tspan.text(tspan.text()+endsymbol||'')
+        }else{
+            if (old_words!=='')
+                old_words = old_words.split('');
+                tspan.text(words.join(' ')+' '+old_words.join(''));
+                while (tspan.node().getComputedTextLength() > width && old_words.length) {
+                    old_words.pop();
+                    tspan.text(words.join(' ')+' '+old_words.join(''));
+                }
+        }
+    });
+}//wrap
+function wrap(text, istruncate,width) {
+    if (istruncate){
+        truncate(text,'');
+    }else {
+        text.each(function () {
+            var text = d3.select(this),
+                words = text.text().split(/\s+/).reverse(),
+                word,
+                line = [],
+                lineNumber = 0,
+                lineHeight = 1, // ems
+                y = text.attr("y"),
+                dy = parseFloat(text.attr("dy")),
+                tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+            width = width || parseFloat(text.attr('width'));
+            while (word = words.pop()) {
+                line.push(word);
+                tspan.text(line.join(" "));
+                if (tspan.node().getComputedTextLength() > width) {
+                    line.pop();
+                    tspan.text(line.join(" "));
+                    line = [word];
+                    tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", lineHeight + dy + "em").text(word);
+                }
+            }
+        });
+    }
+    return text;
+}
+function controlView(config){
+    switch(config.charType){
+        case 'T-sne Chart':
+            d3.selectAll('.radarcontroller_layout').classed('hide',false);
+            d3.selectAll('.singleservice_layout').classed('hide',true);
+            break;
+        default:
+            d3.selectAll('.singleservice_layout').classed('hide',false);
+            d3.selectAll('.radarcontroller_layout').classed('hide',true);
+            break;
+    }
+    switch(config.sumType){
+        case 'RadarSummary':
+        case 'Radar':
+            d3.selectAll('.radarcontroller_layout').classed('hide',false);
+            break;
+        case 'Boxplot':
+            d3.selectAll('.singleservice_layout').classed('hide',false);
+            break;
+        default:
+
+            break;
+    }
+}
+function onloaddetermire (data,divid){
+    divid = divid|| '.cover';
+    d3.select(divid+' .status').text('');
+    const determinate =  d3.select(divid+' .determinate').style('width',data.process.toFixed(2)+'%');
+    d3.select(divid+' .progressText').text(data.message);
+    if (data.message==='finish'){
+        d3.select(divid+' .progressDiv').classed('hidden', true);
+        d3.select(divid).classed('hidden', true);
+        d3.select(divid+' .status').text('load data....');
+    }else{
+        d3.select(divid+' .progressDiv').classed('hidden', false);
+    }
+}
+function preloader(on,percentage,message,divid){
+    divid = divid|| '.cover';
+    if (on){
+        d3.select(divid).classed('hidden', false);
+        if(percentage)
+            onloaddetermire({message:message||'collecting data....',process:percentage},divid)
+        else {
+            spinner.spin(target);
+            if (message)
+            {
+                d3.select(divid).select('h5.spinnerC').text(message);
+            }
+        }
+    }else {
+        onloaddetermire({message:'finish',process:100},divid);
+        d3.select(divid).classed('hidden', true);
+        spinner.stop();
+    }
+}
+
+function millisecondsToStr (milliseconds) {
+    // TIP: to find current time in milliseconds, use:
+    // var  current_time_milliseconds = new Date().getTime();
+
+    function numberEnding (number) {
+        return (number > 1) ? 's' : '';
+    }
+
+    var temp = Math.floor(milliseconds / 1000);
+    var years = Math.floor(temp / 31536000);
+    var str = '';
+    if (years) {
+        str+= years + ' year' + numberEnding(years);
+    }
+    //TODO: Months! Maybe weeks?
+    var days = Math.floor((temp %= 31536000) / 86400);
+    if (days) {
+        str+= days + ' day' + numberEnding(days)+' ';
+    }
+    var hours = Math.floor((temp %= 86400) / 3600);
+    if (hours) {
+        str+= hours + ' hour' + numberEnding(hours)+' ';
+    }
+    var minutes = Math.floor((temp %= 3600) / 60);
+    if (minutes) {
+        str+= minutes + ' minute' + numberEnding(minutes)+' ';
+    }
+    var seconds = temp % 60;
+    if (seconds) {
+        str+= seconds + ' second' + numberEnding(seconds)+' ';
+    }
+    if(str==='')
+        return Math.round(milliseconds)+' ms' ; //'just now' //or other string you like;
+    else
+        return str;
+}
+
+function updateDatainformation(timearray,filename){
+    dataInformation.size = bytesToString(dataInformation.size);
+    dataInformation.hostsnum = hosts.length;
+    dataInformation.timerange = millisecondsToStr(_.last(timearray)-timearray[0]);
+    dataInformation.interval = millisecondsToStr(timearray[1] - timearray[0]);
+    dataInformation.totalstep = timearray.length;
+    dataInformation.datanum = d3.format(",.0f")(dataInformation.totalstep*dataInformation.hostsnum);
+    let dataholder = d3.select('#datainformation');
+    for (key in dataInformation)
+        dataholder.select(`.${key}`).text(dataInformation[key]);
+    if(sampleS)
+        d3.select(".currentDate")
+            .text("" + (sampleS['timespan'][0]).toDateString());
+}
+function bytesToString (bytes) {
+    // One way to write it, not the prettiest way to write it.
+
+    var fmt = d3.format('.0f');
+    if (bytes < 1024) {
+        return fmt(bytes) + 'B';
+    } else if (bytes < 1024 * 1024) {
+        return fmt(bytes / 1024) + 'kB';
+    } else if (bytes < 1024 * 1024 * 1024) {
+        return fmt(bytes / 1024 / 1024) + 'MB';
+    } else {
+        return fmt(bytes / 1024 / 1024 / 1024) + 'GB';
+    }
+}
+function onSaveDescription (){
+    var filename = $('#savename_description').val()+".json";
+    var type = "json";
+    var str = JSON.stringify(clusterDescription);
+    var file = new Blob([str], {type: type});
+    if (window.navigator.msSaveOrOpenBlob) // IE10+
+        window.navigator.msSaveOrOpenBlob(file, filename);
+    else { // Others
+        var a = document.createElement("a"),
+            url = URL.createObjectURL(file);
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+    }
+}
+function onSaveClusterInfo() {
+    csv_header = ['labels'];
+    serviceFullList.forEach(d => {
+        csv_header.push(d.text);
+        csv_header.push(d.text + '_min');
+        csv_header.push(d.text + '_max');
+    });
+    csv_header.push('mse');
+    csv_header.push('radius');
+    csv_header.push('description');
+
+    dataout = [];
+    serviceFullList.forEach(d => {
+        d.scale = d3.scaleLinear().range(d.range);
+    });
+    cluster_info.forEach((d, i) => {
+        let temp = [i];
+        d.__metrics.forEach((s, i) => {
+            temp.push(serviceFullList[i].scale(s.value));
+            temp.push(serviceFullList[i].scale(s.minval));
+            temp.push(serviceFullList[i].scale(s.maxval));
+        });
+        // if (binopt.clusterMethod ==='leaderbin')
+        //     temp.push(d.bin.distance);
+        temp.push(d.mse);
+        temp.push(d.radius);
+        temp.push(clusterDescription[d.name].text.replace(/,/g,' '));
+        dataout.push(temp);
+    });
+
+    download_csv();
+
+    function download_csv() {
+        var csv = csv_header.join(',') + '\n';
+        dataout.forEach(function (row) {
+            csv += row.join(',');
+            csv += "\n";
+        });
+
+        var filename = $('#savename_clusterInfo').val()+".csv";
+        var hiddenElement = document.createElement('a');
+        hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+        hiddenElement.target = '_blank';
+        hiddenElement.download = filename;
+        hiddenElement.click();
+    }
+}
+
+// chart controll ------------------------------------
+let viztype='radar';
+let starChart_func, radarChart_func, roseChart_func, flowerChart_func;
+if (typeof RadarChart!== 'undefined') {
+    starChart_func = _.bind(RadarChart, {smooth: 1});
+    radarChart_func = _.bind(RadarChart, {smooth: 0.5});
+    roseChart_func = _.bind(RoseChart, {shape: 'rose'});
+    flowerChart_func = _.bind(RoseChart, {shape: 'flower'});
+    RadarChart = radarChart_func;
+}
+
+// radar draw
+function createRadar_func(datapoint, bg, data, customopt,className,radaropt,colorscale) {
+    className = className||"compute linkLineg ";
+    let size_w = customopt?(customopt.size?customopt.size:radaropt.w):radaropt.w;
+    let size_h = customopt?(customopt.size?customopt.size:radaropt.h):radaropt.h;
+    let colorfill = (customopt&&customopt.colorfill)?(customopt.colorfill===true?0.5:customopt.colorfill):false;
+    let radar_opt = {
+        w: size_w,
+        h: size_h,
+        schema: serviceFullList,
+        margin: {left:0,right:0,top:0,bottom:0},
+        levels: 6,
+        mini:true,
+        radiuschange: false,
+        isNormalize: true,
+        maxValue: 0.5,
+        fillin: colorfill,
+    };
+
+
+    if (datapoint.empty()) {
+        datapoint = bg
+            .append("g")
+            .datum(data)
+            .attr("class", d => className+" " + fixName2Class(d.name));
+
+    }
+
+    // replace thumnail with radar mini
+    if(data)
+        datapoint.data([data])
+    datapoint.each(function(d){
+        d3.select(this).attr('transform',`translate(${-radar_opt.w/2},${-radar_opt.h/2})`)
+        if (colorfill)
+            radar_opt.color = function(){return d.color||colorscale(d.name)};
+        RadarChart(this, [d], radar_opt,"");
+    });
+    return datapoint;
+}
+function ordinal_suffix_of(i,sep) {
+    var j = i % 10,
+        k = i % 100;
+    if (j == 1 && k != 11) {
+        return sep?'st':(i + "st");
+    }
+    if (j == 2 && k != 12) {
+        return sep?'nd': (i + "nd");
+    }
+    if (j == 3 && k != 13) {
+        return sep?'rd': (i + "rd");
+    }
+    return sep?'th': (i + "th");
 }

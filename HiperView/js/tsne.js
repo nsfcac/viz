@@ -167,9 +167,12 @@
                     else { beta = (beta + betamin) / 2; }
                 }
 
-                // stopping conditions: too many tries or got a good precision
-                num++;
                 if(Math.abs(Hhere - Htarget) < tol) { done = true; }
+
+
+
+                // stopping conditions: too many tries or got a good precision - Ngan
+                num++;
                 if(num >= maxtries) { done = true; }
             }
 
