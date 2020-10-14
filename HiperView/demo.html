@@ -130,9 +130,9 @@
                     <label for="chartType_control" class="col s5"> Chart type: </label>
                     <div  class="row s12">
                         <select id="chartType_control" class="col s7">
-                            <option value="Heatmap">Heatmap</option>
+                            <option value="Heatmap" selected="selected">Heatmap</option>
                             <option value="Area Chart">Area Chart</option>
-                            <option value="T-sne Chart" selected="selected">t-SNE Chart</option>
+                            <option value="T-sne Chart">t-SNE Chart</option>
                         </select>
                     </div>
                     <!--<label for="clusterDisplay" class="col s5"> Cluster Display: </label>-->
@@ -378,9 +378,9 @@
                 </select>
 
             </div>
-            <svg width="2600" height="1000" class="mainsvg" ></svg>
+            <svg width="2600" height="1000" class="mainsvg" style="height: calc(100vh - 63px); overflow: visible"></svg>
         </div>
-        <div class="row s12 valign-wrapper center-align">
+        <div class="row s12 valign-wrapper center-align hide" id="snapshootHolder">
             <div id="radarChart1" class="radarChartss col s4"></div>
             <div id="radarChart2" class="radarChartss col s4"></div>
             <div id="radarChart3" class="radarChartss col s4"></div>

@@ -239,6 +239,7 @@
                                     <option value="reduceDim" value2 = "tsne">t-SNE</option>
                                     <option value="reduceDim" value2 = "pca">PCA</option>
                                     <option value="reduceDim" value2 = "umap">UMAP</option>
+                                    <option value="reduceDim" value2 = "scatterplot">Scatterplot</option>
                                 </optgroup>
                             </select>
                             <div class="col s1">
@@ -689,7 +690,7 @@
                     </div>
                 </div>
                 <div class="progress no_magrin hidden" id="load_render">
-                    <div class="determinate" style="width: 10%"></div>
+                    <div class="indeterminate" style="width: 10%"></div>
                 </div>
                 <!--<div class='row s12' id="timeline" style="position: relative;">-->
                     <!--<svg width="100%" height="50" class="timelinesvg" >-->
@@ -722,7 +723,7 @@
                             <div class="progressDiv hidden">
                                 <h6 class="progressText spinnerC center" style="top: calc(50% - 15px);" >saving data...</h6>
                                 <div class="progress spinnerC center" style="width: 70%;">
-                                    <div class="determinate" style="width: 0%"></div>
+                                    <div class="indeterminate" style="width: 0%"></div>
                                 </div>
                             </div>
                         </div>
@@ -752,6 +753,10 @@
                         </svg>
                         <div id="modelWorkerInformation" style="position:absolute;top:0px;right:0; width: 350px; z-index: 10; ">
                             <div id="modelSelectionInformation">
+                                <div class="row empty search-wrapper focused no_magrin ">
+                                    <input type="text" id="search" class="search col s8" placeholder="Search host e.g AT1G34370">
+                                    <i class="material-icons col s1" style="margin: auto;">search</i>
+                                </div>
                                 <ul class="tabs" style="margin-top: 10px">
                                     <li class="tab col s3"><a class="active" href="#modelSetting">Setting</a></li>
                                     <li class="tab col s3"><a href="#modelSelectionTool">Selection</a></li>
@@ -866,6 +871,14 @@
                                         <option class="item" value="-1" selected>--none--</option>
                                         <option class="item" value="0" selected>Radar transparency</option>
                                         <option class="item" value="1">Bin background</option>
+                                    </select>
+                                </div>
+                                <div class="hexagonLayout hide" style="display: inline-block">
+                                    <span> Radar size: </span>
+                                    <select id="radarSize" class="browser-default inline z-depth-2">
+                                        <option class="item" value="0.5" selected>small</option>
+                                        <option class="item" value="1">medium</option>
+                                        <option class="item" value="2">large</option>
                                     </select>
                                 </div>
                             </div>
@@ -1121,6 +1134,7 @@
     <script src="src/script/angular/components/databasetable/datasetselector.js"></script>
     <script src="src/script/angular/components/databasetable/filedropzone.js"></script>
     <script src="src/script/angular/components/databasetable/pastedataset.js"></script>
+    <script src="src/script/angular/components/databasetable/loadurl.js"></script>
     <script src="src/script/angular/components/databasetable/sampledata.js"></script>
     <script src="src/script/angular/components/loadData/loaddata.service.js"></script>
 

@@ -46,22 +46,6 @@ angular.module('hpccApp')
         let loadclusterInfo = false;
 
 
-            if (first||(db === 'csv'&& choice.category==='hpcc')) { //reload hostlist
-                d3.json(srcpath+'data/hotslist_Quanah.json', function (error, data) {
-                    if (error) {
-                    } else {
-                        firstTime = true;
-                        hostList = data;
-                        systemFormat();
-                        inithostResults();
-                        formatService(true);
-                        jobMap.hosts(hosts);
-                        MetricController.axisSchema(serviceFullList, true).update();
-                    }
-                });
-                first = false;
-            }
-
             dataInformation.filename = choice.name;
             if(choice.category==='hpcc')
                 setTimeout(() => {
@@ -79,15 +63,28 @@ angular.module('hpccApp')
                         if (error) {
 
                         }
-
-                        d3.json(choice.url.replace(/(\w+).json|(\w+).csv/,'$1_job_compact.json'), function (error, job) {
-                            if (error) {
-                                loadata1(data, undefined);
+                        if (!choice.values) {
+                            d3.json(choice.url.replace(/(\w+).json|(\w+).csv/, '$1_job_compact.json'), function (error, job) {
+                                if (error) {
+                                    loadata1(data, undefined);
+                                    shap = {};
+                                    d3.json(choice.url.replace(/(\w+).json|(\w+).csv/, '$1_shap.json'), function (error, shape) {
+                                        if (!error)
+                                            shap = shape;
+                                    });
+                                    return;
+                                }
+                                loadata1(data, job);
+                                shap = {};
+                                d3.json(choice.url.replace(/(\w+).json|(\w+).csv/, '$1_shap.json'), function (error, shape) {
+                                    if (!error)
+                                        shap = shape;
+                                });
                                 return;
-                            }
-                            loadata1(data, job);
-                            return;
-                        });
+                            });
+                        }else{
+                            loadata1(choice.values, choice.jobs);
+                        }
                     });
                 }, 0);
             else
@@ -95,20 +92,29 @@ angular.module('hpccApp')
 
         function loadata1(data,job){
             makedataworker();
-            data['timespan'] = data.timespan.map(d=>new Date(d3.timeFormat('%a %b %d %X CDT %Y')(new Date(d.replace('Z','')))));
+            data['timespan'] = data.timespan.map(d=>new Date(d3.timeFormat('%a %b %d %X CDT %Y')(new Date(+d?+d:d.replace('Z','')))));
+            sampleS = data;
+            if (choice.category==='hpcc') { //reload hostlist
+                firstTime = true;
+                systemFormat();
+                inithosts();
+                formatService(true);
+                jobMap.hosts(hosts);
+                MetricController.axisSchema(serviceFullList, true).update();
+                first = false;
+            }
             _.without(Object.keys(data),'timespan').forEach(h=>{
                 delete data[h].arrCPU_load;
                 serviceLists.forEach((s,si)=>{
                     if (data[h][serviceListattr[si]])
                         data[h][serviceListattr[si]] = data.timespan.map((d,i)=>
-                            data[h][serviceListattr[si]][i]? data[h][serviceListattr[si]][i].slice(0,s.sub.length):d3.range(0,s.sub.length).map(e=>null));
+                            data[h][serviceListattr[si]][i]? data[h][serviceListattr[si]][i].slice(0,s.sub.length).map(e=>e?e:null):d3.range(0,s.sub.length).map(e=>null));
                     else
                         data[h][serviceListattr[si]] = data.timespan.map(d=>d3.range(0,s.sub.length).map(e=>null));
                 })
             });
             updateDatainformation(data['timespan']);
-            sampleS = data;
-
+            inithostResults();
             // make normalize data
             initTsnedata();
             if(job)
@@ -122,7 +128,7 @@ angular.module('hpccApp')
                     submitTime: new Date(_.last(sampleS.timespan)-100).toString(),
                     user: "dummyJob"
                 }];
-            if (choice.url.includes('influxdb')){
+            if (choice.group==='url'||choice.url.includes('influxdb')){
                 processResult = processResult_influxdb;
                 db = "influxdb";
                 realTimesetting(false,"influxdb",true,sampleS);
@@ -222,6 +228,16 @@ angular.module('hpccApp')
         preloader(true, 0,"Load data....");
 
         function loadcsv(data) {
+            shap={};
+            try {
+                d3.json(object.url.replace(/(\w+).json|(\w+).csv/, '$1_shap.json'), function (error, shape) {
+                    if (!error)
+                        shap = shape;
+                });
+            }catch (e) {
+                
+            }
+
             db = "csv";
             newdatatoFormat_noSuggestion(data, separate);
             inithostResults();
@@ -237,14 +253,118 @@ angular.module('hpccApp')
             realTimesetting(false, "csv", true, sampleS);
             updateDatainformation(sampleS['timespan']);
 
-            sampleJobdata = [{
-                jobID: "1",
-                name: "1",
-                nodes: hosts.map(h => h.name),
-                startTime: new Date(_.last(sampleS.timespan) - 100).toString(),
-                submitTime: new Date(_.last(sampleS.timespan) - 100).toString(),
-                user: "dummyJob"
-            }];
+            sampleJobdata = [
+                {
+                    "nodes": [
+                        "192.168.7.54",
+                        "192.168.7.58",
+                        "192.168.13.108",
+                        "192.168.13.202",
+                        "192.168.14.212",
+                        "192.168.15.17"
+                    ],
+                    "jobID": "1120375",
+                    "user": "hge",
+                    "startTime": "Mon Feb 17 08:25:57 CDT 2020",
+                    "submitTime": "Wed Feb 12 07:54:40 CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.13.108"
+                    ],
+                    "jobID": "1123369",
+                    "user": "abdumali",
+                    "startTime": "Sat Feb 15 13:00:19 CDT 2020",
+                    "submitTime": "Wed Feb 12 21:05:36 CDT 2020",
+                    "endTime": "Mon Feb 17 1:05:00 PM CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.7.58"
+                    ],
+                    "jobID": "1123380",
+                    "user": "abdumali",
+                    "startTime": "Sat Feb 15 13:23:23 CDT 2020",
+                    "submitTime": "Wed Feb 12 21:05:37 CDT 2020",
+                    "endTime": "Mon Feb 17 1:25:00 PM CDT 2020"
+                },
+
+                {
+                    "nodes": [
+                        "192.168.15.17"
+                    ],
+                    "jobID": "1129038",
+                    "user": "abdumali",
+                    "startTime": "Mon Feb 17 12:13:48 CDT 2020",
+                    "submitTime": "Mon Feb 17 12:13:47 CDT 2020",
+                    "endTime": "Mon Feb 17 7:50:00 PM CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.14.212"
+                    ],
+                    "jobID": "1129039",
+                    "user": "abdumali",
+                    "startTime": "Mon Feb 17 12:13:48 CDT 2020",
+                    "submitTime": "Mon Feb 17 12:13:48 CDT 2020",
+                    "endTime": "Mon Feb 17 7:50:00 PM CDT 2020"
+                }
+                ,{
+                    "nodes": [
+                        "192.168.14.212"
+                    ],
+                    "jobID": "1131921",
+                    "user": "jkorstia",
+                    "startTime": "Tue Feb 18 12:40:42 CDT 2020",
+                    "submitTime": "Tue Feb 18 12:38:46 CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.7.54"
+                    ],
+                    "jobID": "1131923",
+                    "user": "jzahn",
+                    "startTime": "Tue Feb 18 12:40:02 CDT 2020",
+                    "submitTime": "Tue Feb 18 12:40:01 CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.7.58"
+                    ],
+                    "jobID": "1131924",
+                    "user": "anwalie",
+                    "startTime": "Tue Feb 18 12:44:29 CDT 2020",
+                    "submitTime": "Tue Feb 18 12:44:29 CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.7.58"
+                    ],
+                    "jobID": "1131925",
+                    "user": "abkenyon",
+                    "startTime": "Tue Feb 18 12:49:53 CDT 2020",
+                    "submitTime": "Tue Feb 18 12:47:47 CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.14.212",
+                        "192.168.15.17"
+                    ],
+                    "jobID": "1131927",
+                    "user": "qiu25856",
+                    "startTime": "Tue Feb 18 12:57:04 CDT 2020",
+                    "submitTime": "Tue Feb 18 12:57:04 CDT 2020"
+                },
+                {
+                    "nodes": [
+                        "192.168.13.108"
+                    ],
+                    "jobID": "1131928",
+                    "user": "anwalie",
+                    "startTime": "Tue Feb 18 12:57:24 CDT 2020",
+                    "submitTime": "Tue Feb 18 12:57:23 CDT 2020"
+                }
+            ];
 
 
             updateClusterControlUI();

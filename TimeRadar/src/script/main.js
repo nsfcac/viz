@@ -327,6 +327,7 @@ var TsnePlotopt  = {
 var TsneTSopt = {width:width,height:height};
 var PCAopt = {width:width,height:height};
 var umapopt = {width:width,height:height};
+var scatterplotopt = {width:width,height:height};
 var vizMode = 0; // 0 timeradar, 1 tsne, 2 pca, 3 umap
 var runopt ={ // run opt global
     suddenGroup:0,
@@ -350,6 +351,7 @@ function makedataworker(){
 let tsneTS = d3.tsneTimeSpace();
 let pcaTS = d3.pcaTimeSpace();
 let umapTS = d3.umapTimeSpace();
+let scatterplotTS = d3.scatterplotTimeSpace();
 function initDataWorker(){
     getDataWorker.postMessage({action:"init",value:{
             hosts:hosts,
@@ -474,21 +476,22 @@ function main() {
 var currentlastIndex;
 var speedup= 0;
 function drawsummarypoint(harr){
+    const stepup = lastIndex-currentlastIndex;
     lastIndex = currentlastIndex;
     query_time = hostResults['timespan'][currentlastIndex];
-    jobMap.getharr(harr);
-
-    jobMap.dataComp_points(harr.map(i=>{
+    // jobMap.getharr(harr);
+    const stack = {};
+    const datain =harr.map(i=>{
         var h  = harr[i];
         var name = hosts[h].name;
-        // arrServices = getDataByName_withLabel(hostResults, name, lastIndex, lastIndex,0.5);
-        arrServices = tsnedata[name][lastIndex];// getDataByName(hostResults, name, lastIndex, lastIndex,undefined,0.5);
-        // arrServices.name = name;
-        arrServices.time = hostResults.timespan[lastIndex];
+        if (stack[name]===undefined)
+            stack[name] = stepup;
+        arrServices = tsnedata[name][lastIndex-stack[name]];// getDataByName(hostResults, name, lastIndex, lastIndex,undefined,0.5);
+        arrServices.time = hostResults.timespan[lastIndex-stack[name]];
+        stack[name]--;
         return arrServices;
-    }));
-    // var h = harr[harr.length-1];
-    // var name = hosts[h].name;
+    });
+    jobMap.dataComp_points(datain);
 }
 function shiftTimeText(){
     if (timelog.length > maxstack-1){ timelog.shift();
@@ -534,6 +537,7 @@ function request(){
     var countrecord = 0;
     var missingtimetex = false;
     let hasjob = sampleJobdata[0].user!=="dummyJob";
+    iterationstep = 1;
 
     jobMap.maxTimestep(isRealtime? undefined: sampleS.timespan.length);
     isanimation = false
@@ -550,16 +554,19 @@ function request(){
             countarr.push(returnCount);
             count += 1;
         };
-        var midlehandle_full = function (ri){
-            countarr = d3.range(0,hosts.length);
-            count = hosts.length;
+        var midlehandle_full = function (step){
+            countarr = [];
+            for (let i = 0;i<step;i++)
+                for (let j = 0;j<hosts.length;j++)
+                    countarr.push(j)
+            count = countarr.length;
         };
         var drawprocess = function ()  {
             if (islastimestep(lastIndex+1)) {
                 isanimation = true;
                 getData(_.last(hosts).name,lastIndex,true,true);
                 d3.select('#compDisplay_control').attr('disabled',null);
-                console.log('Time load: ',performance.now() -times)
+                console.log('Time load: ',performance.now() -times);
                 getData(_.last(hosts).name,lastIndex)
             }
 
@@ -568,19 +575,7 @@ function request(){
             // fullset draw
             if (count > (hosts.length-1)) {// Draw the summary Box plot ***********************************************************
 
-                // getJoblist(lastIndex,true);
-
-                // Draw date
-                // d3.select(".currentDate")
-                //     .text("" + currentMiliseconds.toDateString());
-
-                // cal to plot
-                // bin.data([]);
-                // currentlastIndex = iteration+iterationstep-1;
-                if(hasjob)
-                    currentlastIndex = iteration+iterationstep-1;
-                else
-                    currentlastIndex = Math.min(iteration+iterationstep-1+sampleS.timespan.length-3,sampleS.timespan.length-1);
+                currentlastIndex = iteration+iterationstep-1;
                 // drawsummary();
                 jobMap.setharr([]);
                 lastIndex = currentlastIndex+1;
@@ -590,6 +585,10 @@ function request(){
                 requeststatus = true;
                 haveMiddle = false;
                 iteration += iterationstep;
+                if(hasjob)
+                    iterationstep = 1;
+                else
+                    iterationstep = Math.min(iteration+iterationstep-1+sampleS.timespan.length-3,sampleS.timespan.length-1)-iteration+1;
                 // updatetimeline(iteration);
             }
             currentlastIndex = iteration;
@@ -623,14 +622,12 @@ function request(){
                 else {
                     do {
                         // let ri = step_full(iteration);
-                        midlehandle_full();
+                        midlehandle_full(iterationstep);
+
                         if(countbuffer===0) {
                             if (islastimestep(lastIndex+1)&&hasjob)
                                 getJoblist();
-                            // document.getElementById("compDisplay_control").selectedIndex = 4;
-                            // d3.select('#compDisplay_control').dispatch("change");
                             jobMap.data(jobList,hostResults.timespan[lastIndex],lastIndex);
-                            // if(isanimation)
                             if(lastIndex%200===0)
                                 requestAnimationFrame(()=>jobMap.draw(true));
                         }
@@ -1145,7 +1142,7 @@ function pausechange(){
 
 function resetRequest(){
     pausechange();
-
+    inithostResults();
     tool_tip.hide();
     firstTime = true;
     if (interval2)
@@ -1433,6 +1430,7 @@ function handle_dataRaw() {
             if(axis_arr.outlier) {
                 let outlierinstance = outlyingList.pointObject[h.name + '_' + i];
                 if (outlierinstance) {
+                    tsnedata[h.name][i].cluster = outlierinstance.cluster;
                     return outlierinstance.cluster;
                 }
             }
@@ -1547,6 +1545,7 @@ function onchangeCluster() {
         })
     });
     cluster_info.forEach(c => c.mse = ss.sum(c.__metrics.map(e => (e.maxval - e.minval) * (e.maxval - e.minval))));
+    outlyingList.forEach(o=>cluster_info[o.labels]=o)
     cluster_map(cluster_info);
     handle_clusterinfo();
 
@@ -1559,6 +1558,7 @@ function onchangeVizType(){
     tsneTS.stop();
     pcaTS.stop();
     umapTS.stop();
+    scatterplotTS.stop();
     switch (vizMode) {
         case 'tsne':
             tsneTS.generateTable();
@@ -1571,6 +1571,10 @@ function onchangeVizType(){
         case 'umap':
             umapTS.generateTable();
             mainviz = umapTS;
+            return true
+        case 'scatterplot':
+            scatterplotTS.generateTable();
+            mainviz = scatterplotTS;
             return true
         default:
             mainviz = jobMap;
@@ -1591,25 +1595,13 @@ function onchangeVizdata(){
             handle_data_TimeSpace = handle_data_umap;
             handle_data_TimeSpace(tsnedata);
             return true;
+        case 'scatterplot':
+            handle_data_TimeSpace = handle_data_scatterplot;
+            handle_data_TimeSpace(tsnedata);
+            return true;
         default:
             return false;
     }
-}
-function calculateServiceRange() {
-    serviceFullList_Fullrange = _.cloneDeep(serviceFullList);
-    serviceList_selected.forEach((s, si) => {
-        const sa = serviceListattr[s.index]
-        let min = +Infinity;
-        let max = -Infinity;
-        _.without(Object.keys(sampleS),'timespan').map(h => {
-            let temp_range = d3.extent(_.flatten(sampleS[h][sa]));
-            if (temp_range[0] < min)
-                min = temp_range[0];
-            if (temp_range[1] > max)
-                max = temp_range[1];
-        });
-        serviceLists[si].sub.forEach(sub => sub.range = [min, max]);
-    })
 }
 
 $( document ).ready(function() {
@@ -1901,68 +1893,6 @@ $( document ).ready(function() {
 
 
     setTimeout(() => {
-    //     //load data
-    //     // d3.csv(srcpath+'data/cluster_27sep2018_9_kmean.csv',function(cluster){
-    //     // d3.csv(srcpath+'data/cluster_27sep2018 _9.csv',function(cluster){
-    //     // d3.csv(srcpath+'data/cluster_27sep2018_10_mse.csv',function(cluster){
-    //     // d3.csv(srcpath+'data/cluster_27sep2018 _11.csv',function(cluster){
-    //     loadPresetCluster('influxdb17Feb_2020_withoutJobLoad');
-    //     d3.json(srcpath+'data/hotslist_Quanah.json',function(error,data){
-    //         if(error) {
-    //         }else{
-    //             hostList = data;
-    //             inithostResults();
-    //             jobMap.hosts(hosts)
-    //             // graphicControl.charType =  d3.select('#chartType_control').node().value;
-    //             // graphicControl.sumType =  d3.select('#summaryType_control').node().value;
-    //             let choiceinit = d3.select('#datacom').node().value;
-    //             if (choiceinit !== "nagios" && choiceinit !== "influxdb") {
-    //                 // d3.select(".currentDate")
-    //                 //     .text("" + d3.timeParse("%d %b %Y")(d3.select('#datacom').node().selectedOptions[0].text).toDateString());
-    //                 if (choiceinit.includes('influxdb')) {
-    //                     // processResult = processResult_influxdb;
-    //                     db = "influxdb";
-    //                     realTimesetting(false, "influxdb", true);
-    //                 } else {
-    //                     db = "nagios";
-    //                     // processResult = processResult_old;
-    //                     realTimesetting(false, undefined, true);
-    //                 }
-    //                 let choice = d3.select('#datacom').node().value;
-    //                 dataInformation.filename = choice+".json";
-    //                 d3.json(srcpath+"data/" + choice + ".json", function (error, data) {
-    //                     if (error) {
-    //                         M.toast({html: 'Local data does not exist, try to query from the internet!'});
-    //                         d3.json("https://media.githubusercontent.com/media/iDataVisualizationLab/HPCC/master/HiperView/data/" + choiceinit + ".json", function (error, data) {
-    //                             if (error) throw error;
-    //                             d3.select(".currentDate")
-    //                                 .text("" + d3.timeParse("%d %b %Y")(d3.select('#datacom').select('[selected="selected"]').text()).toDateString());
-    //                             loadata(data)
-    //                         });
-    //                         return;
-    //                     }
-    //                     d3.select(".currentDate")
-    //                         .text("" + (new Date(data['timespan'][0]).toDateString()));
-    //                     d3.json (srcpath+"data/" + choice + "_job_compact.json", function (error, job) {
-    //                         if (error){
-    //                             loadata(data,undefined);
-    //                             return;
-    //                         }
-    //                         loadata(data,job);
-    //                         return;
-    //                     });
-    //                 });
-    //             }else{ // realtime
-    //                 d3.select(".currentDate")
-    //                     .text("" + (new Date()).toDateString());
-    //                 realTimesetting(true,choiceinit, true);
-    //                 db = choiceinit;
-    //                 requestService = eval('requestService'+choiceinit);
-    //                 processResult = eval('processResult_'+choiceinit);
-    //                 loadata([])
-    //             }
-    //         }
-    //     });
         formatService(true);
         MetricController.graphicopt({width:365,height:365})
             .div(d3.select('#RadarController'))
@@ -1973,28 +1903,6 @@ $( document ).ready(function() {
             .onChangeMinMaxFunc(onChangeMinMaxFunc)
             .init();
     },0);
-    // Spinner Stop ********************************************************************
-
-    // // Turtorial
-    // //initialize instance
-    // var enjoyhint_instance = new EnjoyHint({});
-    //
-    // //simple config.
-    // //Only one step - highlighting(with description) "New" button
-    // //hide EnjoyHint after a click on the button.
-    //     var enjoyhint_script_steps = [
-    //         {
-    //             'click .openbtn' : 'Click the ">" button to open control panel'
-    //         },{
-    //             'change #compDisplay_control' : 'Change the visualization type via this selection'
-    //         }
-    //     ];
-    //
-    // //set script config
-    //     enjoyhint_instance.set(enjoyhint_script_steps);
-    //
-    // //run Enjoyhint script
-    // enjoyhint_instance.run();
 });
 function updateClusterControlUI(n) {
     if(n) {
@@ -2013,6 +1921,9 @@ function updateClusterControlUI(n) {
 let profile = {};
 
 function onfilterdata(schema) {
+    serviceFullList.forEach((s,si)=>{s.filter = schema.axis[s.text].filter;s.norm_filter = (s.filter?s.filter.map(d=>d3.scaleLinear().domain(s.range)(d)):s.filter)});
+    mainviz.schema(serviceFullList);
+    // data_filtered = tsnedata.filter(d=>schema.axisList.map(s=> s.filter!=null?(d[s.data.text]>=s.filter[0])&&(d[s.data.text]<=s.filter[1]):true).reduce((p,c)=>c&&p))
 }
 function onSchemaUpdate(schema){
     serviceFullList.forEach(ser=>{

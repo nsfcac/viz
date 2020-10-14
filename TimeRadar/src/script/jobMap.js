@@ -167,7 +167,7 @@ let JobMap = function() {
             .style('opacity',0)
             .style('pointer-events', runopt.mouse.lensing?'auto':'none');
 
-        table_headerNode = g.append('g').attr('class', 'table header').attr('transform', `translate(600,${0})`);
+        table_headerNode = g.append('g').attr('class', 'table header').attr('transform', `translate(600,${-15})`);
         table_headerNode.append('g').attr('class','back').append('path').styles({'fill':'#ddd'});
 
         timebox = svg.append('g').attr('class','timebox')
@@ -627,15 +627,6 @@ let JobMap = function() {
                     if (supportp)
                         data_path.push([fisheye_scale.x(timelineScale(d.end+1)),scaleNode_y_middle(datap.timeline.lineFull[i+1].cluster,d.end+1,datap.name)]);
                     return curveBundle(data_path);
-                    // linkHorizontal({
-                    //     source: {
-                    //         x: fisheye_scale.x(timelineScale(d.end)),
-                    //         y: scaleNode_y_middle(d.cluster,d.end,datap.values_name[0]),
-                    //     },
-                    //     target: {
-                    //         x: fisheye_scale.x(timelineScale(d.start)),
-                    //         y: scaleNode_y_middle(datap[i+1].cluster,datap[i+1].end,datap.values_name[0]),
-                    //     }});
                 })
             datacurve.exit().remove();
             datacurve.enter()
@@ -1215,6 +1206,8 @@ let JobMap = function() {
         if(!islight&&animation_time===0){
             nodeg.selectAll('.computeNode').remove();
         }
+
+        // hosts/compute
         let computers = nodeg.selectAll('.computeNode').data(clusterdata_timeline||clusterNode_data||Hosts,d=> d.name);
         computers.select('.computeSig').datum(d=>d);
         computers.exit().remove();
@@ -1324,7 +1317,7 @@ let JobMap = function() {
 
             jobNode.selectAll('path').style('stroke-width', d => d.values ? Jobscale(d.values.length) : 1.5);
 
-
+            // user node
             let userNode = nodeg.selectAll('.userNode').data(user, d => d.name);
             userNode.exit().remove();
             let userNode_n = userNode.enter().append('g').attr('class', d => 'node userNode new ' + fixName2Class(fixstr(d.name)));
@@ -1366,6 +1359,7 @@ let JobMap = function() {
             userNode.select('.userNodeSig_label')
                 .text(d => d.name);
 
+            // table
             handle_sort(true, true);
             updaterow(userNode);
             // table_header(table_headerNode);
@@ -1375,7 +1369,7 @@ let JobMap = function() {
                 table_footerNode = nodeg.append('g').attr('class', 'table footer');
             table_footerNode.append('g').attr('class', 'back').append('path').styles({'fill': '#ddd'});
 
-            table_footerNode.attr('transform', `translate(600,${yscale(user.length)})`);
+            table_footerNode.attr('transform', `translate(600,${yscale(user.length+1)})`);
             table_footer(table_footerNode);
 
 
@@ -1650,10 +1644,11 @@ let JobMap = function() {
         })
     }
     function updaterow(path){
+        var delta_h = Math.max(tableLayout.row.height/2,15)
         let rows = path.selectAll('.row').data(d=>[showtable?tableData[d.name]:tableData[d.name].filter(e=>tableLayout.column[e.key])],e=>e.id);
         rows.exit().remove();
         let rows_n = rows.enter().append('g').attr('class', 'row')
-            .attr('transform',`translate(0,${-tableLayout.row.height/2})`);
+            .attr('transform',`translate(0,${-delta_h})`);
         // rows_n.append('rect').attrs({'class':'back-row','width':tableLayout.row.width,'height':tableLayout.row.height});
         let cells = rows_n.merge(rows).selectAll('.cell').data(d=>d,d=>d.key);
         cells.exit().remove();

@@ -22,7 +22,8 @@ d3.viiolinChart = function () {
                 method : 'DensityEstimator', // epsilon is learning rate (10 = default)
                 resolution : 50, // resolution
                 dataformated: false
-            }
+            },
+            isStack:false
         },
         runopt,
         arr = [],viiolin = undefined,
@@ -42,12 +43,12 @@ d3.viiolinChart = function () {
 
 
     let createviolin = d3.area()
-        .x0(function(d){
-            return(xNum(-d[1])) } )
-        .x1(function(d){ return(xNum(d[1])) } )
-        .y(function(d){ return(h(d[0])) } )
+            .x0(function(d){
+                return(xNum(-d[1])) } )
+            .x1(function(d){ return(xNum(d[1])) } )
+            .y(function(d){ return(h(d[0])) } )
         // .curve(d3.curveLinear)
-        .curve(d3.curveCardinal.tension(0.3))
+        // .curve(d3.curveCardinal.tension(0.3))
     ;
     let circleoption = function (d){
         return {
@@ -162,16 +163,20 @@ d3.viiolinChart = function () {
             };
         }
         let viol_chart = contain.selectAll('.violin').data(arr,d=>d.axis)
+            .classed('hide',d=>!d.arr.length);
+        viol_chart
+            .transition()
             .call(getpos_func);
         viol_chart.select('.gvisaxis .laxis') .call(laxis);
         viol_chart.exit().remove();
         let viol_n = viol_chart.enter()
             .append('g')
-            .attr('class','violin').call(getpos_func);
+            .attr('class','violin')
+            .call(getpos_func);
         let axisg = viol_n.append('g').attr('class', 'gvisaxis')
             .style('stroke','black');
-            axisg.append('line').attr('class','laxis')
-                .call(laxis);
+        axisg.append('line').attr('class','laxis')
+            .call(laxis);
 
         if(graphicopt.tick===undefined && graphicopt.tick.visibile!= false) {
             viol_chart.select('.gvisaxis .tick1') .call(tick1);
@@ -193,16 +198,18 @@ d3.viiolinChart = function () {
             }
         }
 
-
+        viol_chart.attr("d",d=> createviolin(d.arr)   // This makes the line smoother to give the violin appearance. Try d3.curveStep to see the difference
+        );
         viol_n.append("path");
+        viol_n.style('stroke',graphicopt.stroke)
+            .style('stroke-width','0.2');
         viol_chart = viol_n.merge(viol_chart);
         viol_chart.select('path').datum(d=>{return d;})
-            .style('stroke',graphicopt.stroke)
-            .style('stroke-width','0.2')
             .style('fill',d=>graphicopt.color(d.axis))
+            .transition()
             // .style('fill','currentColor')
             .attr("d",d=> createviolin(d.arr)   // This makes the line smoother to give the violin appearance. Try d3.curveStep to see the difference
-        );
+            );
 
         let median_rect = viol_chart.selectAll('rect.median').data(d=>d.median!==undefined?[d.median]:[]).call(draw_median);
         median_rect.exit().remove();
@@ -252,21 +259,33 @@ d3.viiolinChart = function () {
 
     let kde;
     let h = d3.scaleLinear();
-    let xNum = d3.scaleSqrt();
+    let xNum = d3.scaleLinear();
     let gpos = d3.scalePoint().padding(0.5);
     function handledata(data){
         // h.range([0, graphicopt.direction === 'v' ? graphicopt.heightG() : graphicopt.widthG()]);
         // xNum.range([0, (graphicopt.direction === 'h' ? graphicopt.heightG() : graphicopt.widthG())/2]);
         if(graphicopt.direction === 'v') {
             h.range([graphicopt.heightG(),0]);
-            gpos.domain(data.map((d,i)=>d.axis+i))
-                .range([-graphicopt.widthG()/2,graphicopt.widthG()/2])
+            if (graphicopt.isStack){
+                gpos = ()=> 0
+            }else
+                gpos = d3.scalePoint().padding(0.5).domain(data.map((d,i)=>d.axis+i))
+                    .range([-graphicopt.widthG()/2,graphicopt.widthG()/2]);
+            createviolin = createviolin.curve(d3.curveMonotoneY)
         }else {
             h.range([0, graphicopt.widthG()]);
-            gpos.domain(data.map((d,i)=>d.axis+i))
-                .range([graphicopt.heightG(),0])
+
+            gpos = d3.scalePoint().padding(0.5).domain(data.map((d,i)=>d.axis+i))
+                .range([graphicopt.heightG(),0]);
+            createviolin = createviolin.curve(d3.curveMonotoneX)
         }
-        xNum.range([0, gpos.step()/2]);
+        xNumrange = (graphicopt.single_w||gpos.step())/2;
+        if (graphicopt.isStack)
+            if (data.length===1)
+                xNumrange = xNumrange*2;
+            else
+                xNumrange = graphicopt.widthG()/data.length
+        xNum.range([0, xNumrange]);
         let sumstat;
         if (graphicopt.opt.dataformated){
             // if (data[0].arr.length)
@@ -296,6 +315,33 @@ d3.viiolinChart = function () {
                 }
             });
             xNum.domain([0, maxNum]);
+        }
+        if (graphicopt.isStack) {
+            let temp ={};
+            let min=Infinity,max=-Infinity;
+            sumstat = data.map(d=>({axis:d.axis,arr:[]}));
+            data.forEach((d,i)=>d.arr.forEach(e=>{
+                if (!temp[e[0]]) {
+                    temp[e[0]] = [];
+                    if (min > e[0])
+                        min = e[0];
+                    if (max < e[0])
+                        max = e[0];
+                    temp[e[0]].total = 0;
+                }
+                temp[e[0]].push({id:i,value:e[1]});
+                temp[e[0]].total+=e[1];
+                temp[e[0]].offset = -temp[e[0]].total/2;
+            }));
+            Object.keys(temp).forEach(i=>{
+                temp[i].forEach((d,di)=>{
+                    let y0 = temp[i].offset;
+                    let y1 = temp[i].offset+d.value;
+                    sumstat[d.id].arr.push([+i,y0,y1]);
+                    temp[i].offset = y1
+                })
+            });
+            sumstat.forEach(s=>s.arr.sort((a,b)=>a[0]-b[0]));
         }
         return sumstat;
     }
@@ -328,6 +374,9 @@ d3.viiolinChart = function () {
         return arguments.length ? (svg = _, viiolinplot) : svg;
 
     };
+    viiolinplot.scale = function(){
+        return h;
+    }
     let rangeY;
     viiolinplot.rangeY = function (_) {
         return arguments.length ? (rangeY = _, viiolinplot) : rangeY;
@@ -352,7 +401,6 @@ d3.viiolinChart = function () {
             }
             if (graphicopt.direction=="v") {
                 createviolin
-                    // = d3.area()
                     .x0(function (d) {
                         return (xNum(-d[1]))
                     })
@@ -362,7 +410,13 @@ d3.viiolinChart = function () {
                     .y(function (d) {
                         return (h(d[0]))
                     })
-                    // .curve(d3.curveCatmullRom);
+                if (graphicopt.isStack)
+                    createviolin.x0(function (d) {
+                        return (xNum(d[2]))
+                    }).x1(function (d) {
+                        return (xNum(d[1]))
+                    })
+                // .curve(d3.curveCatmullRom);
                 circleoption = function (d){
                     return {
                         r: graphicopt.dotRadius,
@@ -374,15 +428,19 @@ d3.viiolinChart = function () {
                 createviolin
                     // = d3.area()
                     .y0(function (d) {
-                        return (xNum(-d[1]))
+                        return (xNum(d[1]))
                     })
                     .y1(function (d) {
-                        return (xNum(d[1]))
+                        return (xNum(-d[1]))
                     })
                     .x(function (d) {
                         return (h(d[0]))
                     })
-                    // .curve(d3.curveCatmullRom);
+                if (graphicopt.isStack)
+                    createviolin.y1(function (d) {
+                        return (xNum(d[2]))
+                    })
+                // .curve(d3.curveCatmullRom);
                 circleoption = function (d){
                     return {
                         r: graphicopt.dotRadius,

@@ -4,7 +4,7 @@
 ////////////////// VisualCinnamon.com ///////////////////
 /////////// Inspired by the code of alangrafu ///////////
 /////////////////////////////////////////////////////////
-    
+
 function RadarChart(id, data, options, name) {
     this.smooth = this.smooth===undefined?0.5:this.smooth;
     var cfg = {
@@ -36,12 +36,13 @@ function RadarChart(id, data, options, name) {
         ringStroke_width: 0.5,
         schema: undefined,
         animationDuration:100,
+        innerRadius:4,
         events:{
             axis: {
                 mouseover: function(){},
                 mouseleave: function(){},
                 click: function(){},
-                },
+            },
         },
         color: function () {
             return 'rgb(167, 167, 167)'
@@ -57,15 +58,10 @@ function RadarChart(id, data, options, name) {
         }//for i
     }//if
 
-    var maxValue,minValue,range,arrThresholds,colorTemperature,opaTemperature,allAxis,rScale,scaleMarkedLegend;
-    range = thresholds[0];
+    var maxValue,minValue,range,arrThresholds,colorTemperature,opaTemperature,allAxis,allAxisObj={},rScale,scaleMarkedLegend;
+    range = [0,1]
     // NEW SETTING
     //If the supplied maxValue is smaller than the actual one, replace by the max in the data
-    maxValue = Math.max(cfg.maxValue, d3.max(data, function (i) {
-        return d3.max(i.map(function (o) {
-            return o.value;
-        }))
-    }));
 
     if (cfg.isNormalize){
         minValue = 0;
@@ -90,7 +86,7 @@ function RadarChart(id, data, options, name) {
     var dif = 1 / (cfg.levels-2);
     var right = 1 + dif;
     // cfg.arrThresholds = [-dif]; // 3/18/2020
-    cfg.arrThresholds = [-4/cfg.w]; // 3/18/2020
+    cfg.arrThresholds = [-cfg.innerRadius/cfg.w]; // 3/18/2020
     for (var i=0;i<colorLength-1;i++)
         cfg.arrThresholds.push(i*dif);
     cfg.arrThresholds.push(right);
@@ -103,19 +99,25 @@ function RadarChart(id, data, options, name) {
 
     if (cfg.schema){
         range = [0,1];
-        allAxis = cfg.schema.filter(d=>d.enable);
+        allAxis = cfg.schema.filter(d=>{
+            if (d.enable) allAxisObj[d.text] = d;
+            return d.enable;
+        });
+        allAxis = _.sortBy(allAxis,'angle');
     }else{
         //Names of each axis
         angleSlice = cfg.angleSlice;
         allAxis = (data[0].map(function (i, j) {
-                return {text: i.axis, angle: angleSlice[j]};
-            }));
+            allAxisObj[i.axis] = {text: i.axis, angle: angleSlice[j]};
+            return allAxisObj[i.axis];
+        }));
+        allAxis = _.sortBy(allAxis,'angle')
     }
     let deltaAng = Math.PI/10;
     // Re-adjust angles
-    minValue = range[0] - (range[1]-range[0])*4/cfg.w;
+    minValue = range[0] - (range[1]-range[0])*cfg.innerRadius/cfg.w;
     // minValue = range[0]-dif*(range[1]-range[0]); // 3/18/2020
-    maxValue = range[1]+dif*(range[1]-range[0])- (range[1]-range[0])*4/cfg.w;
+    maxValue = range[1]+dif*(range[1]-range[0])- (range[1]-range[0])*cfg.innerRadius/cfg.w;
 
     let  radius = Math.min(cfg.w / 2, cfg.h / 2);    //Radius of the outermost circle
     Format = d3.format('');               //Percentage formatting
@@ -124,15 +126,16 @@ function RadarChart(id, data, options, name) {
         if (ditem.bin)
             ditem.bin.val = ditem.bin.val.map(v=>v.filter((d,i)=>allAxis.find(e=>e.text===ditem[i].axis)));
 
-        const ditem_filtered = ditem.filter(d=>allAxis.find(e=>e.text===d.axis));
-        let temp = _.sortBy(ditem_filtered,d=>allAxis.find(e=>e.text===d.axis).angle);
+        const ditem_filtered = ditem.filter(d=>allAxisObj[d.axis]);
+        let temp = _.sortBy(ditem_filtered,d=>allAxisObj[d.axis].angle);
         temp.type = ditem.type;
         temp.name = ditem.name;
         temp.bin = ditem.bin; return temp;});
     //Scale for the radius
-    rScale = d3.scaleLinear()
+    rScale_or = d3.scaleLinear()
         .range([0, radius])
         .domain([minValue, maxValue]);
+    rScale = (d)=>(d<minValue?0:rScale_or(d));
 
 
     /////////////////////////////////////////////////////////
@@ -175,16 +178,16 @@ function RadarChart(id, data, options, name) {
         var temptest = svg.selectAll(".currentTimeText");
         if (temptest.empty())
             svg.append("text")
-            .attr("class", "currentTimeText")
-            .attr("x", 10)
-            .attr("y", 12)
-            .attr("fill", "#000")
-            .style("text-anchor", "start")
-            .style("font-weight", "bold")
-            .style("font-size", "12px")
-            .style("text-shadow", "1px 1px 0 rgba(255, 255, 255")
-            .attr("font-family", "sans-serif")
-            .text(name);
+                .attr("class", "currentTimeText")
+                .attr("x", 10)
+                .attr("y", 12)
+                .attr("fill", "#000")
+                .style("text-anchor", "start")
+                .style("font-weight", "bold")
+                .style("font-size", "12px")
+                .style("text-shadow", "1px 1px 0 rgba(255, 255, 255")
+                .attr("font-family", "sans-serif")
+                .text(name);
         else
             temptest.text(name);
     }
@@ -210,25 +213,25 @@ function RadarChart(id, data, options, name) {
             feMergeNode_1 = feMerge.append('feMergeNode').attr('in', 'coloredBlur'),
             feMergeNode_2 = feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
-    //     const rg = svg.append("defs").append("radialGradient")
-    //         .attr("id", "rGradient2");
-    //     createGradient(rg,1,arrColor)
-    //     //Filter for the outside glow
-    //     var filter = g.append('defs').append('filter').attr('id', 'glow'),
-    //         feGaussianBlur = filter.append('feGaussianBlur').attr('stdDeviation', '2.5').attr('result', 'coloredBlur'),
-    //         feMerge = filter.append('feMerge'),
-    //         feMergeNode_1 = feMerge.append('feMergeNode').attr('in', 'coloredBlur'),
-    //         feMergeNode_2 = feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-    //
-    //     //Filter for the outside glow
-    //     var filter = g.append('defs').append('filter').attr('id', 'glow2'),
-    //         feGaussianBlur = filter.append('feGaussianBlur').attr('stdDeviation', '1').attr('result', 'coloredBlur'),
-    //         feMerge = filter.append('feMerge'),
-    //         feMergeNode_1 = feMerge.append('feMergeNode').attr('in', 'coloredBlur'),
-    //         feMergeNode_2 = feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-    // /////////////////////////////////////////////////////////
-    // /////////////// Draw the Circular grid //////////////////
-    // /////////////////////////////////////////////////////////
+        //     const rg = svg.append("defs").append("radialGradient")
+        //         .attr("id", "rGradient2");
+        //     createGradient(rg,1,arrColor)
+        //     //Filter for the outside glow
+        //     var filter = g.append('defs').append('filter').attr('id', 'glow'),
+        //         feGaussianBlur = filter.append('feGaussianBlur').attr('stdDeviation', '2.5').attr('result', 'coloredBlur'),
+        //         feMerge = filter.append('feMerge'),
+        //         feMergeNode_1 = feMerge.append('feMergeNode').attr('in', 'coloredBlur'),
+        //         feMergeNode_2 = feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+        //
+        //     //Filter for the outside glow
+        //     var filter = g.append('defs').append('filter').attr('id', 'glow2'),
+        //         feGaussianBlur = filter.append('feGaussianBlur').attr('stdDeviation', '1').attr('result', 'coloredBlur'),
+        //         feMerge = filter.append('feMerge'),
+        //         feMergeNode_1 = feMerge.append('feMergeNode').attr('in', 'coloredBlur'),
+        //         feMergeNode_2 = feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+        // /////////////////////////////////////////////////////////
+        // /////////////// Draw the Circular grid //////////////////
+        // /////////////////////////////////////////////////////////
 
         //Wrapper for the grid & axes
         var axisGrid = g.append("g").attr("class", "axisWrapper");
@@ -238,7 +241,7 @@ function RadarChart(id, data, options, name) {
 
 
     }
-    const angle_scale = d3.scaleLinear().domain(allAxis.map(d=>d.angle).sort((a,b)=>a-b)).range(d3.range(0,allAxis.length));
+    const angle_scale = d3.scaleLinear().domain(allAxis).range(d3.range(0,allAxis.length));
 
     if (!cfg.mini) {
         /////////////////////////////////////////////////////////
@@ -351,42 +354,42 @@ function RadarChart(id, data, options, name) {
     }
     //The radial line function
     let radarLine, radialAreaGenerator, radialAreaQuantile,keyLine='value';
-        radarLine  = d3.radialLine()
+    radarLine  = d3.radialLine()
         // .interpolate("linear-closed")
-            .curve(d3.curveCatmullRom.alpha(this.smooth))
-            .radius(function (d) {
-                return rScale(d[keyLine] === undefined ? d : d[keyLine]);
-            })
-            .angle(function (d, i) {
-                return getAngle(d, i);
-            });
+        .curve(d3.curveCatmullRom.alpha(this.smooth))
+        .radius(function (d) {
+            return rScale(d[keyLine] === undefined ? d : d[keyLine]);
+        })
+        .angle(function (d, i) {
+            return getAngle(d, i);
+        });
 
-        radialAreaGenerator = d3.radialArea()
-            .angle(function (d, i) {
-                return getAngle(d, i);
-            })
-            .innerRadius(function (d, i) {
-                return rScale(d.minval);
-            })
-            .outerRadius(function (d, i) {
-                return rScale(d.maxval);
-            });
+    radialAreaGenerator = d3.radialArea()
+        .angle(function (d, i) {
+            return getAngle(d, i);
+        })
+        .innerRadius(function (d, i) {
+            return rScale(d.minval);
+        })
+        .outerRadius(function (d, i) {
+            return rScale(d.maxval);
+        });
 
-        radialAreaQuantile = d3.radialArea()
-            .angle(function (d, i) {
-                return getAngle(d, i);
-            })
-            .innerRadius(function (d, i) {
-                return rScale(d.q1);
-            })
-            .outerRadius(function (d, i) {
-                return rScale(d.q3);
-            });
-        if(cfg.roundStrokes) {
-            radarLine.curve(d3.curveCardinalClosed.tension(this.smooth));
-            radialAreaGenerator.curve(d3.curveCardinalClosed.tension(this.smooth));
-            radialAreaQuantile.curve(d3.curveCardinalClosed.tension(this.smooth));
-        }
+    radialAreaQuantile = d3.radialArea()
+        .angle(function (d, i) {
+            return getAngle(d, i);
+        })
+        .innerRadius(function (d, i) {
+            return rScale(d.q1);
+        })
+        .outerRadius(function (d, i) {
+            return rScale(d.q3);
+        });
+    if(cfg.roundStrokes) {
+        radarLine.curve(d3.curveCardinalClosed.tension(this.smooth));
+        radialAreaGenerator.curve(d3.curveCardinalClosed.tension(this.smooth));
+        radialAreaQuantile.curve(d3.curveCardinalClosed.tension(this.smooth));
+    }
 
     //Create a wrapper for the blobs
     var blobWrapperg = g.selectAll(".radarWrapper")
@@ -588,8 +591,8 @@ function RadarChart(id, data, options, name) {
             if (d3.select(this).select('.radarLine').empty())
                 d3.select(this).append("path").classed('radarLine',true).style("fill", "none").call(drawMeanLine);
         }))
-        blobWrapper
-            .append("path").classed('radarLine',true).style("fill", "none").call(drawMeanLine);
+            blobWrapper
+                .append("path").classed('radarLine',true).style("fill", "none").call(drawMeanLine);
 
         if(quantile_exist)
             blobWrapper.append("path").classed('radarQuantile',true).style("fill", "none").call(drawQuantileArea);
@@ -613,12 +616,12 @@ function RadarChart(id, data, options, name) {
             .style("fill-opacity", (d,i)=>cfg.fillin?cfg.fillin:null)
             .style("fill", (d,i)=>cfg.fillin?cfg.color(i,d):"none");
     }
-        //.style("filter" , "url(#glow2)");
+    //.style("filter" , "url(#glow2)");
     blobWrapperpath = g.selectAll(".radarWrapper").selectAll(".radarStroke");
     if (cfg.bin) {
         var listhost = [];
         data.forEach(d=>{
-           d.bin.name.forEach(n=>{listhost.push(n)});
+            d.bin.name.forEach(n=>{listhost.push(n)});
         });
         blobWrapperpath.on("mouseenter",mouseenterfunctionbold );
     }
@@ -690,7 +693,7 @@ function RadarChart(id, data, options, name) {
             if (showClass!=='')
                 d3.selectAll("." + filterhost.map(d=>fixName2Class(d)).join(', .'))
                     .classed("displayNone", false);
-                // .style("visibility", 'hidden');
+            // .style("visibility", 'hidden');
 
             // hosts.forEach(l => {
             //     if (d.bin.name.filter(e => e === l.name).length === 0)
@@ -782,7 +785,7 @@ function RadarChart(id, data, options, name) {
     /////////////////////////////////////////////////////////
     //////// Append invisible circles for tooltip ///////////
     /////////////////////////////////////////////////////////
-    
+
     //Wrapper for the invisible circles on top
     if (!cfg.bin&&!cfg.gradient&&!cfg.mini&&cfg.showHelperPoint) {
         var blobCircleWrapperg = g.selectAll(".radarCircleWrapper")
@@ -857,7 +860,7 @@ function RadarChart(id, data, options, name) {
             .style("opacity", 0);
     }
     function getAngle(d,i){
-        return (allAxis.find(a=>a.text===d.axis)||allAxis[i]).angle;
+        return (allAxisObj[d.axis]||allAxis[i]).angle;
     }
     function getAngleStart(d,i){
         return (allAxis.find(a=>a.text===d.axis)||allAxis[i]).angle - deltaAng;
@@ -872,29 +875,29 @@ function RadarChart(id, data, options, name) {
     //Taken from http://bl.ocks.org/mbostock/7555321
     //Wraps SVG text    
     function wrap(text, width) {
-      text.each(function() {
-        var text = d3.select(this),
-            words = text.text().split(/\s+/).reverse(),
-            word,
-            line = [],
-            lineNumber = 0,
-            lineHeight = 0.9, // ems
-            y = text.attr("y"),
-            x = text.attr("x"),
-            dy = parseFloat(text.attr("dy")),
-            tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
-            
-        while (word = words.pop()) {
-          line.push(word);
-          tspan.text(line.join(" "));
-          if (tspan.node().getComputedTextLength() > width) {
-            line.pop();
-            tspan.text(line.join(" "));
-            line = [word];
-            tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
-          }
-        }
-      });
+        text.each(function() {
+            var text = d3.select(this),
+                words = text.text().split(/\s+/).reverse(),
+                word,
+                line = [],
+                lineNumber = 0,
+                lineHeight = 0.9, // ems
+                y = text.attr("y"),
+                x = text.attr("x"),
+                dy = parseFloat(text.attr("dy")),
+                tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+
+            while (word = words.pop()) {
+                line.push(word);
+                tspan.text(line.join(" "));
+                if (tspan.node().getComputedTextLength() > width) {
+                    line.pop();
+                    tspan.text(line.join(" "));
+                    line = [word];
+                    tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                }
+            }
+        });
     }//wrap
     //Text indicating at what % each level is
     if (!cfg.mini&&cfg.showText) {
@@ -969,5 +972,5 @@ function RadarChart(id, data, options, name) {
     //     rScale: rScale,
     //     colorTemperature: colorTemperature};
     return svg;
-    
+
 }//RadarChart

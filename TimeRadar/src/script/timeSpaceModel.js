@@ -16,7 +16,8 @@ d3.TimeSpace = function () {
             heightG: function () {
                 return this.heightView() - this.margin.top - this.margin.bottom
             },
-
+            zoomLevels:{levels:[{value: 20,viztype: 1},{value:11,viztype:2}],
+                getViz:function(){ return controll_metrics.zoom<=this.levels[0].value?(controll_metrics.zoom<=this.levels[1].value?this.levels[1].viztype:this.levels[0].viztype):0}},
             opt: {
                 dim: 2, // dimensionality of the embedding (2 = default)
                 windowsSize: 1,
@@ -47,9 +48,9 @@ d3.TimeSpace = function () {
             isCurve: false,
             filter:{ distance:0.5},
             component:{
-                dot:{size:5,opacity:0.9},
-                link:{size:1,opacity:0.2, highlight:{opacity:3}},
-                label:{enable:1}
+                dot:{size:5,opacity:0.9,filter:{size:5, opacity:0.2}},
+                link:{size:1,opacity:0.2, highlight:{opacity:1}},
+                label:{enable:0}
             },
             serviceIndex: 0,
             tableLimit: 1500,
@@ -81,6 +82,14 @@ d3.TimeSpace = function () {
             //     variable: 'windowsSize',
             //     width: '100px',callback:()=>{master.stop(); windowsSize = graphicopt.opt.windowsSize; handle_data_TimeSpace(tsnedata);}
             // },
+            allPoint: {
+                text: "Show all data",
+                type: "switch",
+                variable: 'allPoint',
+                labels:['off','on'],
+                values:[false,true], width: '100px',
+                callback:()=>{master.stop(); handle_data_TimeSpace(tsnedata);}
+            },
             radarRatio: {
                 text: "Peeling clusters",
                 range: [0.1, 1],
@@ -233,6 +242,7 @@ d3.TimeSpace = function () {
             controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
             controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
             enableRadarView(true);
+            d3.select('#modelSetting').selectAll('.dim3').attr('disabled','').select('select, input').attr('disabled','');
         }else{
             controls.enableRotate = true;
             controls.screenSpacePanning  = false;
@@ -241,6 +251,7 @@ d3.TimeSpace = function () {
             controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
             controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
             enableRadarView(false);
+            d3.select('#modelSetting').selectAll('.dim3').attr('disabled',null).select('select, input').attr('disabled',null);
         }
         if (obitTrigger) {
             setUpZoom();
@@ -272,7 +283,7 @@ d3.TimeSpace = function () {
         opt.dim = Math.floor(opt.dim);
         // end - adjust dimension
         datain.forEach(d=>delete d.__metrics.radar);
-        modelWorker.postMessage({action: "initDataRaw",opt:opt, value: datain,mask:  serviceFullList.map(d=>d.enable),labels: datain.map(d=>d.cluster), clusterarr: cluster.map(d=>d.__metrics.normalize)});
+        modelWorker.postMessage({action: "initDataRaw",opt:opt, value: datain,mask:  serviceFullList.map(d=>d.enable),maxTimeStep:scaleNormalTimestep.domain()[1],labels: datain.map(d=>d.cluster), clusterarr: cluster.map(d=>d.__metrics.normalize)});
         modelWorker.addEventListener('message', ({data}) => {
             switch (data.action) {
                 case "render":
@@ -310,6 +321,7 @@ d3.TimeSpace = function () {
                     reduceRenderWeight(true);
                     break;
                 default:
+                    preloader(true,data.value.percentage,data.value.message,'#modelLoading');
                     break;
             }
         })
@@ -338,7 +350,8 @@ d3.TimeSpace = function () {
     let controll_metrics={old:{zoom:undefined}};
     master.init = function(arr,clusterin) {
         preloader(true,1,'Prepare rendering ...','#modelLoading');
-
+        $('#search').on('input', searchHandler); // register for oninput
+        $('#search').on('propertychange', searchHandler); // for IE8
         // makeDataTableFiltered()
 
         // prepare data
@@ -388,6 +401,7 @@ d3.TimeSpace = function () {
             .alphaDecay(0.005)
             .alpha(0.1)
             .force('charge', d3.forceManyBody())
+            .force("link", d3.forceLink())
             .force('collide', d3.forceCollide().radius(graphicopt.radarTableopt.w/2).iterations(10))
             .on('tick', function () {
                 if (isdrawradar&&svgData&&animateTrigger){
@@ -757,8 +771,8 @@ d3.TimeSpace = function () {
                 datain.forEach((d, i) => {
                     if (d.name === target.name) {
                         INTERSECTED.push(i);
-                        attributes.alpha.array[i] = graphicopt.component.dot.opacity;
-                        attributes.size.array[i] = target.timestep===d.timestep? graphicopt.component.dot.size*2:graphicopt.component.dot.size;
+                        attributes.alpha.array[i] = d.filtered?graphicopt.component.dot.filter.opacity:graphicopt.component.dot.opacity;
+                        attributes.size.array[i] = target.timestep===d.timestep? graphicopt.component.dot.size*2: (d.filtered?graphicopt.component.dot.filter.opacity:graphicopt.component.dot.size);
                         lines[d.name].visible = true;
                         lines[d.name].material.opacity = 1;
                         lines[d.name].material.linewidth  = graphicopt.component.link.highlight.opacity;
@@ -807,8 +821,8 @@ d3.TimeSpace = function () {
                 datain.forEach((d, i) => {
                     if (visibledata.indexOf(i) !==-1 || (filterGroupsetting.timestep!==undefined && filterGroupsetting.timestep===d.__timestep)){
                         INTERSECTED.push(i);
-                        attributes.alpha.array[i] = graphicopt.component.dot.opacity;
-                        attributes.size.array[i] = graphicopt.component.dot.size;
+                        attributes.alpha.array[i] = d.filtered?graphicopt.component.dot.filter.opacity:graphicopt.component.dot.opacity;
+                        attributes.size.array[i] = d.filtered?graphicopt.component.dot.filter.size:graphicopt.component.dot.size;
                         lines[d.name].visible = filterGroupsetting.timestep===undefined;
                         lines[d.name].material.opacity = graphicopt.component.link.opacity;
                         lines[d.name].material.linewidth  = graphicopt.component.link.highlight.opacity;
@@ -823,8 +837,8 @@ d3.TimeSpace = function () {
                 });
             }else
                 datain.forEach((d, i) => {
-                    attributes.alpha.array[i] = graphicopt.component.dot.opacity;
-                    attributes.size.array[i] = graphicopt.component.dot.size;
+                    attributes.alpha.array[i] = d.filtered?graphicopt.component.dot.filter.opacity:graphicopt.component.dot.opacity;
+                    attributes.size.array[i] = d.filtered?graphicopt.component.dot.filter.size:graphicopt.component.dot.size;
                     lines[d.name].visible = true;
                     lines[d.name].material.opacity = graphicopt.component.link.opacity;
                     lines[d.name].material.linewidth  = graphicopt.component.link.size;
@@ -894,7 +908,7 @@ d3.TimeSpace = function () {
                     .style('stroke-opacity',1);
             });
         if(redraw){
-            d3.select('#modelWorkerScreen_svg_g').selectAll('.timeSpaceR').each(function(d){
+            old.each(function(d){
                 d.value.radar = d3.select(this);
                 let colorfill = 0.5;
                 if (!+$('#radarOpacity').val()>0)
@@ -1059,11 +1073,16 @@ d3.TimeSpace = function () {
 
     function startCollide() {
         d3.select('#modelWorkerScreen_svg').classed('white',true);
-        forceColider.alpha(0.1).force('collide').radius(radarSize).iterations(10);
+        forceColider.alpha(0.1).force('collide').radius(function(d){return d.fixed?0:radarSize}).iterations(10);
         // forceColider.force('charge').distanceMin(radarSize * 2);
         forceColider.nodes(svgData.pos);
         updateforce();
         forceColider.restart()
+    }
+
+    function getRadarSze(radarData) {
+        // radarSize = Math.min(graphicopt.radaropt.w / 2, Math.sqrt(graphicopt.widthG() * graphicopt.heightG() / Math.PI / radarData.length) * 0.75)*(+$('#radarSize').val());
+        radarSize = (graphicopt.radaropt.w / 2 )*(+$('#radarSize').val());
     }
 
     function highlightGroupNode(intersects,timestep) { // INTERSECTED
@@ -1102,7 +1121,7 @@ d3.TimeSpace = function () {
             visibledata = [];
             datain.forEach((d, i) => {
                 if (intersects.indexOf(d.name) !==-1 || (timestep!==undefined && timestep===d.__timestep)){
-                    attributes.alpha.array[i] = graphicopt.component.dot.opacity;
+                    attributes.alpha.array[i] = d.filtered?graphicopt.component.dot.filter.opacity:graphicopt.component.dot.opacity;
                     lines[d.name].visible = timestep===undefined;
                     lines[d.name].material.opacity = graphicopt.component.link.opacity;
                     lines[d.name].material.linewidth  = graphicopt.component.link.highlight.opacity;
@@ -1123,20 +1142,14 @@ d3.TimeSpace = function () {
 
             if(isdrawradar){
                 svgData = {data:radarData,posStatic:posArr,pos:_.cloneDeep(posArr)};
-                radarSize = Math.min(graphicopt.radaropt.w/2,Math.sqrt(graphicopt.widthG()*graphicopt.heightG()/Math.PI/radarData.length)*0.75);
+                getRadarSze(radarData);
 
                 // filter cluster by input data
                 const clusterGroup = d3.nest().key(d=>d.cluster).object(radarData);
                 cluster.forEach((d,i)=>d.__metrics.hide=!clusterGroup[i])
                 filterlabelCluster();
-                //
                 d3.select('#radarCollider').dispatch('action');
 
-                // for (let i=0;i<100;i++) {
-                //     forceColider.tick();
-                // }
-                // forceColider.dispatch('tick');
-                // drawRadar(svgData);
             }else{
                 forceColider.stop();
             }
@@ -1146,7 +1159,7 @@ d3.TimeSpace = function () {
             linesGroup.visible = !!graphicopt.linkConnect;
             tooltip_lib.hide(); // hide tooltip
             datain.forEach((d, i) => {
-                attributes.alpha.array[i] = graphicopt.component.dot.opacity;
+                attributes.alpha.array[i] = d.filtered?graphicopt.component.dot.filter.opacity:graphicopt.component.dot.opacity;
                 lines[d.name].visible = true;
                 lines[d.name].material.opacity = graphicopt.component.link.opacity;
                 lines[d.name].material.linewidth  = graphicopt.component.link.size;
@@ -1163,7 +1176,7 @@ d3.TimeSpace = function () {
         isneedrender = true;
     }
     function computesvgData(){
-        if (!svgData) {
+        // if (!svgData) {
             const ismarked =visibledata&& !!visibledata.length;
             d3.select('#modelWorkerScreen_svg_g').style('pointer-events','none').attr('transform',`translate(0,0) scale(1)`).selectAll('*').remove();
             controll_metrics.old = {x:controll_metrics.x,y:controll_metrics.y,zoom:controll_metrics.zoom,scale:controll_metrics.scale||1};
@@ -1174,7 +1187,7 @@ d3.TimeSpace = function () {
             if (!ismarked)
                 visibledata = [];
             datain.forEach((d, i) => {
-                if(!ismarked||ismarked&&visibledata.find(v=>v===i)) {
+                if(d.inscreen&&(!ismarked||ismarked&&visibledata.find(v=>v===i))) {
                     radarData.push(d);
                     posArr.push(getpos(attributes.position.array[i * 3], attributes.position.array[i * 3 + 1], attributes.position.array[i * 3 + 2], i));
                 }
@@ -1182,13 +1195,13 @@ d3.TimeSpace = function () {
                     visibledata.push(i);
             });
             svgData = {data: radarData, posStatic: posArr, pos: _.cloneDeep(posArr)};
-            radarSize = Math.min(graphicopt.radaropt.w / 2, Math.sqrt(graphicopt.widthG() * graphicopt.heightG() / Math.PI / radarData.length) * 0.75);
+            getRadarSze(radarData)
 
             // filter cluster by input data
             const clusterGroup = d3.nest().key(d => d.cluster).object(radarData);
             cluster.forEach((d, i) => d.__metrics.hide = !clusterGroup[i]);
             filterlabelCluster();
-        }
+        // }
     }
     function enableRadarView(isenable){
         if (isenable){
@@ -1203,6 +1216,7 @@ d3.TimeSpace = function () {
     let animationtimer = undefined;
     let disableMouseover = false, isneedrender = false;
     let mouseclick = false;
+
     function onClick(){
         if (!isMousemove) {
             mouseclick = true;
@@ -1248,7 +1262,7 @@ d3.TimeSpace = function () {
                     if (mouseclick){
                         disableMouseover = !!(!disableMouseover && INTERSECTED.length);
                         mouseclick = false;
-                        if (svgData&&!disableMouseover){
+                        if (svgData&&!disableMouseover && svgData.clickedOb){
                             svgData.clickedOb.dispatch('mouseleave')
                         }
                     }
@@ -1287,7 +1301,10 @@ d3.TimeSpace = function () {
                 // visiableLine(graphicopt.linkConnect);
                 controls.update();
                 renderer.render(scene, camera);
-                if (solution[Math.floor(graphicopt.opt.dim)]&&solution[Math.floor(graphicopt.opt.dim)].length)
+                var frustum = new THREE.Frustum();
+                frustum.setFromMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+                datain.forEach((d,i)=>d.inscreen = frustum.containsPoint(new THREE.Vector3(points.geometry.attributes.position.array[i*3],points.geometry.attributes.position.array[i*3+1],points.geometry.attributes.position.array[i*3+2])));
+                if ((graphicopt.component.label.enable==1||graphicopt.component.label.enable==3)&&solution[Math.floor(graphicopt.opt.dim)]&&solution[Math.floor(graphicopt.opt.dim)].length)
                     cluster.forEach(c=>{
                         if (datain[c.__metrics.indexLeader]) {
                             const pos = position2Vector(datain[c.__metrics.indexLeader].__metrics.position);
@@ -1295,6 +1312,11 @@ d3.TimeSpace = function () {
                         }
                     });
                 updatelabelCluster();
+                // console.log(controll_metrics.zoom)
+                if(iscameraMove||onrendercalled) {
+                    setVizlevel(graphicopt.zoomLevels.getViz());
+                    onrendercalled = false;
+                }
             }
             iscameraMove = false;
             isneedrender = false;
@@ -1579,7 +1601,7 @@ d3.TimeSpace = function () {
                 currentChart = RadarChart(".radarTimeSpace", [dataRadar], radarChartclusteropt, "");
             }else{
                 d3.select('.selectionName').classed('hide',false);
-                d3.select('.selectionName').text(`${dataRadar.name_or} at ${scaleTime.invert(dataRadar.timestep).toISOString()}`)
+                d3.select('.selectionName').text(`${dataRadar.name_or} at ${d3.timeFormat("%B %d, %Y %H:%M:%S")(scaleTime.invert(dataRadar.__timestep))}`)
                 holder.select('.singleRadar').classed('hide',false);
 
                     let cloneOpt = _.cloneDeep(radarChartclusteropt);
@@ -1690,7 +1712,7 @@ d3.TimeSpace = function () {
                 b: 20,
                 t: 50,
             };
-
+        layout.legend={traceorder:"normal"}
         layout.shapes = path[name].map((v, i) => {
             return {
                 type: 'rect',
@@ -1727,8 +1749,18 @@ d3.TimeSpace = function () {
             }
         });
         let cdata = datain.filter(d=>d.name===name);
+        
+        let schema = [];
 
-        const data_in = graphicopt.radaropt.schema.map((s,si) => {
+        if (shap[name]){
+            let temp = shap[name].slice();
+            temp.forEach((d,i)=>{d.index = i;d.total = d3.sum(d3.values(d.value))})
+            temp.sort((a,b)=>d3.sum(d3.values(b.value)) - d3.sum(d3.values(a.value)));
+            schema= temp.map(d=>graphicopt.radaropt.schema[d.index])
+        }
+        else
+            schema =graphicopt.radaropt.schema;
+        const data_in = schema.map((s,si) => {
             let temp = {x:[],
                 y:[],
                 text:[],
@@ -1738,7 +1770,7 @@ d3.TimeSpace = function () {
                 // marker:{
                 //     symbol:s.id
                 // },
-                legendgroup: `group${s.idroot}`,
+                // legendgroup: `group${s.idroot}`,
                 line:{
                     dash: lineType(s.idroot)
                 }
@@ -1875,7 +1907,7 @@ d3.TimeSpace = function () {
             colors[i*3+0]= color.r/255;
             colors[i*3+1]= color.g/255;
             colors[i*3+2]= color.b/255;
-            alpha[i]= 1;
+            alpha[i]= target.filterd?graphicopt.component.dot.filter.opacity:graphicopt.component.dot.opacity;
             sizes[i] = graphicopt.component.dot.size;
         }
         pointsGeometry.setAttribute( 'position', new THREE.BufferAttribute( pos, 3 ) );
@@ -1912,6 +1944,18 @@ d3.TimeSpace = function () {
         return p;
     }
     let mapIndex =[];
+    function searchHandler (e){
+        if (e.target.value!=="") {
+            let results = datain.filter(h=>h.name.includes(e.target.value)).map(h=>({index:path[h.name][0].index}));
+            console.log(results)
+            if(results.length<graphicopt.tableLimit)
+                highlightNode([results[0]]);
+            else
+                highlightNode([])
+        }else{
+            highlightNode([]);
+        }
+    }
 
     // function transition(){
     //     interuptAnimation();
@@ -1952,7 +1996,7 @@ d3.TimeSpace = function () {
             });
             let pointData = [];
             points.geometry.attributes.alpha.array.forEach((p,pi)=>{
-                if (p) {
+                if (p>0.2 && datain[pi].inscreen) {
                     let temp = getpos(points.geometry.attributes.position.array[pi * 3], points.geometry.attributes.position.array[pi * 3 + 1], points.geometry.attributes.position.array[pi * 3 + 2]);
                     temp = [temp.x, temp.y];
                     temp.index = pi;
@@ -1995,11 +2039,12 @@ d3.TimeSpace = function () {
     function filterlabelCluster() {
         clusterMarker.classed('hide',d=>d.__metrics.hide);
     }
-
+    let onrendercalled = false;
     function render (islast){
         if (isneedCompute) {
             try{
             let p = points.geometry.attributes.position.array;
+                onrendercalled = true;
             if (solution[Math.floor(graphicopt.opt.dim)] && solution[Math.floor(graphicopt.opt.dim)].length) {
                 createRadar = _.partialRight(createRadar_func, 'timeSpace radar', graphicopt.radaropt, colorscale);
                 solution[Math.floor(graphicopt.opt.dim)].forEach(function (d, i) {
@@ -2009,7 +2054,7 @@ d3.TimeSpace = function () {
                     let pointIndex = mapIndex.indexOf(i);
                     if (pointIndex !== undefined) {
 
-                        p[pointIndex * 3 + 0] = xscale(d[0]);
+                        p[pointIndex * 3] = xscale(d[0]);
                         p[pointIndex * 3 + 1] = yscale(d[1]);
 
                         // 3rd dimension as time step
@@ -2086,7 +2131,13 @@ d3.TimeSpace = function () {
             d.__metrics.name = d.clusterName;
             d.__metrics.name_or = d.name;
             d.__metrics.timestep = d.timestep;
+            d.__metrics.__timestep = d.__timestep;
         });
+        if (graphicopt.radaropt.schema){
+            data.forEach(d=> {
+                d.filtered = ! graphicopt.radaropt.schema.map((s,si) => s.norm_filter != null ? (d[si] >= s.norm_filter[0]) && (d[si] <= s.norm_filter[1]) : true).reduce((p, c) => c && p);
+            })
+        }
         let maxstep = sampleS.timespan.length - 1;
         scaleTime = d3.scaleTime().domain([sampleS.timespan[0], sampleS.timespan[maxstep]]).range([0, maxstep]);
         scaleNormalTimestep.domain([0, maxstep]);
@@ -2352,6 +2403,13 @@ d3.TimeSpace = function () {
     };
     let self = this;
     let needRecalculate=true;
+    function setVizlevel(level){
+        let old_val = +$('#radarCollider').val();
+        if (old_val!==level)
+            $('#radarCollider').val(level);
+        if (level || (old_val!==0 && (level===0)))
+            d3.select('#radarCollider').dispatch('action');
+    }
     master.generateTable = function(){
         $( "#modelWorkerInformation" ).draggable({ containment: "parent", scroll: false });
         needRecalculate = true
@@ -2378,11 +2436,12 @@ d3.TimeSpace = function () {
             ]
         ];
         d3.values(self.controlPanel).forEach(d=>{
-            tableData[1].push({label:d.text,type:d.type,content:d,variable: d.variable})
+            tableData[1].push({label:d.text,type:d.type,content:d,variable: d.variable,class:d.class})
         });
         d3.values(controlPanelGeneral).forEach(d=>{
-            tableData[1].push({label:d.text,type:d.type,content:d,variable: d.variable,variableRoot: d.variableRoot,id:d.id})
+            tableData[1].push({label:d.text,type:d.type,content:d,variable: d.variable,variableRoot: d.variableRoot,id:d.id,class:d.class})
         });
+        d3.keys(self.formatTable).forEach(k=>formatTable[k]=self.formatTable[k]);
         tableData[2] = _.concat(tableData[2],self.outputSelection);
         let tbodys = table_info.selectAll('tbody').data(tableData);
         tbodys
@@ -2390,6 +2449,7 @@ d3.TimeSpace = function () {
             .selectAll('tr').data(d=>d)
             .enter().append('tr')
             .attr('id',d=>d.id?d.id:null)
+            .attr('class',d=>d.class?d.class:null)
             .selectAll('td').data(d=>d.type==="title"?[d]:[{text:d.label},d.type?{content:d.content,variable:d.variable,variableRoor: d.variableRoot}:{text:d.content,variable:d.variable}])
             .enter().append('td')
             .attr('colspan',d=>d.type?"2":null)
@@ -2420,8 +2480,10 @@ d3.TimeSpace = function () {
                                 d.content.variableRoot[d.content.variable] = +this.get();
                             if (d.content.callback)
                                 d.content.callback();
-                            else
+                            else{
+                                obitTrigger=true;
                                 start();
+                            }
                         });
                     }else if (d.content.type === "checkbox") {
                         let div = d3.select(this).style('width', d.content.width).append('label').attr('class', 'valign-wrapper left-align');
@@ -2444,30 +2506,38 @@ d3.TimeSpace = function () {
                             graphicopt.opt[d.content.variable]  =  d.content.values[+this.checked];
                             if (d.content.callback)
                                 d.content.callback();
-                            else
+                            else {
+                                obitTrigger=true;
                                 start();
+                            }
                         })
                     }else if (d.content.type === "selection") {
+                        let label = _.isFunction(d.content.labels)?d.content.labels():d.content.labels;
+                        let values = _.isFunction(d.content.values)?d.content.values():d.content.values;
                         let div = d3.select(this).style('width', d.content.width)
                             .append('select')
                             .on('change',function(){
-                                setValue(d.content,d.content.values[this.value])
+                                setValue(d.content,values[this.value])
                                 // if (!d.content.variableRoot) {
                                 //     graphicopt[d.content.variable]  =  d.content.values[this.value];
                                 // }else
                                 //     graphicopt[d.content.variableRoot][d.content.variable] = d.content.values[this.value];
                                 if (d.content.callback)
                                     d.content.callback();
+                                else {
+                                    obitTrigger=true;
+                                    start();
+                                }
                             });
                         div
-                            .selectAll('option').data(d.content.labels)
+                            .selectAll('option').data(label)
                             .enter().append('option')
                             .attr('value',(e,i)=>i).text((e,i)=>e);
-                        let default_val = graphicopt[d.content.variable];
-                        // if (d.content.variableRoot)
-                        //     default_val = graphicopt[d.content.variableRoot][d.content.variable];
-                        console.log(getValue(d.content))
-                        $(div.node()).val( d.content.values.indexOf( getValue(d.content)));
+                        // let default_val = graphicopt[d.content.variable];
+                        // // if (d.content.variableRoot)
+                        // //     default_val = graphicopt[d.content.variableRoot][d.content.variable];
+                        // console.log(getValue(d.content))
+                        $(div.node()).val( values.indexOf( getValue(d.content)));
                     }
                 }
             });
@@ -2500,15 +2570,21 @@ d3.TimeSpace = function () {
                     draw_grid_hexagon(svgData);
             }
         });
+        d3.select('#radarSize').on('change',function(){
+            if (svgData) {
+                d3.select('#radarCollider').dispatch('action');
+            }
+        });
         d3.select('#radarCollider').on('change',function(){
             d3.select(this).dispatch('action')
         }).on('action',function(){
             const newValue = +$('#radarCollider').val();
             if (newValue) {
                 computesvgData();
-                d3.select('.specialLayout').attr('disabled','').classed('hide',false)
+                d3.select   ('.specialLayout').attr('disabled','').classed('hide',false)
                     .select('#radarOpacity').attr('disabled','');
             }
+            d3.select('.hexagonLayout').classed('hide',false);
             if (svg)
                 svg.select('#modelWorkerScreen_grid').classed('hide',true);
             switch (newValue) {
@@ -2538,18 +2614,18 @@ d3.TimeSpace = function () {
                     // forceColider.tick();
                     break;
                 default:
-
+                    d3.select('.hexagonLayout').classed('hide',true);
                     d3.select('.specialLayout').classed('hide',true);
                     if (svg)
                         svg.classed('white',false);
                     if (forceColider&&svgData&&svgData.posStatic) {
                         forceColider.stop();
-                        svgData = undefined
+                        svgData = undefined;
                         removeRadar();
                     }
                     break;
             }
-        })
+        });
         d3.select('#radarCollider').dispatch('action');
     };
     master.redrawRadar = function(){
@@ -2559,16 +2635,18 @@ d3.TimeSpace = function () {
         table_info.select(`.datain`).text(e=>datain.length);
         d3.select('#modelCompareMode').property('checked',graphicopt.iscompareMode)
         d3.values(self.controlPanel).forEach((d)=>{
-            if (graphicopt.opt[d.variable]) {
+            if (graphicopt.opt[d.variable]!==undefined) {
                 try {
-                    d3.select(`.${d.variable} div`).node().noUiSlider.set(graphicopt.opt[d.variable]);
+                    d3.select(`#modelWorkerInformation .${d.variable} div`).node().noUiSlider.set(graphicopt.opt[d.variable]);
                 }catch(e){
                     switch (d.type) {
                         case 'switch':
-                            d3.select(`.${d.variable} input`).node().checked = graphicopt.opt[d.variable];
+                            d3.select(`#modelWorkerInformation .${d.variable} input`).node().checked = graphicopt.opt[d.variable];
                             break;
-                        case 'selection':
-                            $(d3.select(`.${d.variable} selection`).node()).val( d.values.indexOf(graphicopt[d.variable]));
+                        case "selection":
+                            // if (d.variable==='var1')
+                            //     values = _.isFunction(d.values)?d.values():d.values;
+                            $(d3.select(`#modelWorkerInformation .${d.variable} select`).node()).val( getValue(d));
                             break;
                     }
                 }
@@ -2601,7 +2679,15 @@ d3.TimeSpace = function () {
         });
 
     }
-
+    function handle_filter(){
+        if (datain){
+            handle_data(datain);
+                isneedrender = true;
+            ishighlightUpdate = true;
+                highlightNode([]);
+                console.log(datain.filter(d=>d.filtered).length)
+        }
+    }
     function loadProjection(opt,calback){
         let totalTime_marker = performance.now();
         d3.json(`data/${dataInformation.filename.replace('.csv','')}_${opt.projectionName}_${opt.nNeighbors}_${opt.dim}_${opt.minDist}_${opt.supervisor}.json`).then(function(sol){
@@ -2680,7 +2766,7 @@ d3.TimeSpace = function () {
     };
 
     master.schema = function (_) {
-        return arguments.length ? (graphicopt.radaropt.schema = _,radarChartclusteropt.schema=_,schema = _, master) : schema;
+        return arguments.length ? (graphicopt.radaropt.schema = _,radarChartclusteropt.schema=_,schema = _ ,handle_filter(), master) : schema;
     };
     master.dispatch = function (_) {
         return arguments.length ? (returnEvent = _, master) : returnEvent;
@@ -2693,7 +2779,10 @@ function calculateMSE_num(a,b){
     return ss.sum(a.map((d,i)=>(d-b[i])*(d-b[i])));
 }
 
-d3.pcaTimeSpace = _.bind(d3.TimeSpace,{name:'PCA',controlPanel: {},workerPath:'src/script/worker/PCAworker.js',outputSelection:[{label:"Total time",content:'_',variable:'totalTime'}]});
+d3.pcaTimeSpace = _.bind(d3.TimeSpace,{name:'PCA',controlPanel: {
+        timeFactor:{text:"Time linearization", range:[0,10], type:"slider",step:0.1, variable: 'timeFactor',width:'100px'}
+    },
+    workerPath:'src/script/worker/PCAworker.js',outputSelection:[{label:"Total time",content:'_',variable:'totalTime'}]});
 d3.tsneTimeSpace = _.bind(d3.TimeSpace,
     {name:'t-SNE',controlPanel: {
         epsilon: {text: "Epsilon", range: [1, 40], type: "slider", variable: 'epsilon', width: '100px'},
@@ -2707,20 +2796,28 @@ d3.tsneTimeSpace = _.bind(d3.TimeSpace,
         },
     },workerPath:'src/script/worker/tSNETimeSpaceworker.js',outputSelection:[ {label: "#Iterations", content: '_', variable: 'iteration'},
         {label: "Cost", content: '_', variable: 'cost'},
-        {label: "\u0394 cost", content: '_', variable: 'deltacost'},
-        {label: "Time per step", content: '_', variable: 'time'},
-        {label: "Total time", content: '_', variable: 'totalTime'}]});
+            {label: "\u0394 cost", content: '_', variable: 'deltacost'},
+            {label: "Time per step", content: '_', variable: 'time'},
+            {label: "Total time", content: '_', variable: 'totalTime'}]});
 d3.umapTimeSpace  = _.bind(d3.TimeSpace,
     {name:'UMAP',controlPanel: {
             minDist:{text:"Minimum distance", range:[0,1], type:"slider", variable: 'minDist',width:'100px',step:0.1},
             nNeighbors:{text:"#Neighbors", range:[1,200], type:"slider", variable: 'nNeighbors',width:'100px'},
+            timeFactor:{text:"Time linearization", range:[0,10], type:"slider",step:0.1, variable: 'timeFactor',width:'100px'},
             supervisor: {text: "Supervised", type: "switch", variable: 'supervisor',labels:['off','on'],values:[false,true], width: '100px'},
-        },workerPath:'src/script/worker/umapworker.js',
+        },formatTable:{'timeFactor':function(d){return d3.format('.1f')(d)}},workerPath:'src/script/worker/umapworker.js',
         outputSelection:[ {label:"#Iterations",content:'_',variable: 'iteration'},
             {label:"Time per step",content:'_',variable:'time'},
             {label:"Total time",content:'_',variable:'totalTime'},]});
 
-
+d3.scatterplotTimeSpace  = _.bind(d3.TimeSpace,
+    {name:'Scatterplot',controlPanel: {
+            var1:{text:"Variable 1", type:"selection",variableRoot:'opt', variable: 'var1',width:'100px',labels:()=>serviceFullList.map(d=>d.text),values:()=>d3.range(0,serviceFullList.length)},
+            var2:{text:"Variable 2", type:"selection",variableRoot:'opt', variable: 'var2',width:'100px',labels:()=>serviceFullList.map(d=>d.text),values:()=>d3.range(0,serviceFullList.length)},
+            var3:{text:"Variable 3", type:"selection",variableRoot:'opt', variable: 'var3',width:'100px',labels:()=>serviceFullList.map(d=>d.text),values:()=>d3.range(0,serviceFullList.length),class:'dim3'},
+        },workerPath:'src/script/worker/scatterplotworker.js',
+        outputSelection:[
+            {label:"Total time",content:'_',variable:'totalTime'},]});
 
 let windowsSize = 1;
 let radarRatio = 2;
@@ -2800,7 +2897,7 @@ function handle_data_model(tsnedata,isKeepUndefined,notblock) {
                 if (isKeepUndefined)
                 {
                     for (let i = 0; i< currentData.length; i++){
-                        if (currentData[i]===0)
+                        if (currentData[i]===null||currentData[i]===undefined)
                             currentData[i] = -1;
                     }
                 }
@@ -2815,7 +2912,93 @@ function handle_data_model(tsnedata,isKeepUndefined,notblock) {
     timeSpacedata = dataIn;
     return dataIn;
 }
+function handle_data_model_full(tsnedata,isKeepUndefined,notblock) {
+    if(!notblock)
+        preloader(true,1,'preprocess data','#modelLoading');
+    windowsSize = windowsSize||1;
+    // get windown surrounding
+    let windowSurrounding =  (windowsSize - 1)/2;
+    let dataIn = [];
+    // let timeScale = d3.scaleLinear().domain([0,sampleS.timespan.length-1]).range([0,timeWeight]);
+    d3.values(tsnedata).forEach(axis_arr => {
+        let lastRadar; // last Radar on list
+        let lastcluster;
+        let lastcluster_insterted;
+        let lastdataarr;
+        let count = 0;
+        let timeLength = sampleS.timespan.length;
+        sampleS.timespan.forEach((t, i) => {
+            let currentData = axis_arr[i].slice();
+            currentData.cluster = axis_arr[i].cluster;
+            currentData.name = axis_arr[i].name;
+            currentData.__timestep = axis_arr[i].timestep;
+            currentData.__minDist = axis_arr[i].minDist;
+            let index = currentData.cluster;
+            currentData.clusterName = cluster_info[index].name;
+            let appendCondition = !cluster_info[currentData.cluster].hide;
+            // appendCondition = appendCondition && !(lastcluster !== undefined && index === lastcluster) || runopt.suddenGroup && calculateMSE_num(lastdataarr, currentData) > cluster_info[currentData.cluster].mse * runopt.suddenGroup;
+            appendCondition = true;
+            lastcluster = index;
+            lastdataarr = currentData.slice();
+            if (appendCondition) {
+                if (lastRadar)
+                    lastRadar.__deltaTimestep = i - lastRadar.__timestep+1;
+                lastcluster_insterted = index;
+                // if (!(lastcluster !== undefined && index === lastcluster)|| currentData.cluster===13 || runopt.suddenGroup && calculateMSE_num(lastdataarr, currentData) > cluster_info[currentData.cluster].mse * runopt.suddenGroup) {
+                currentData.show = true;
+                // // add all points
+                // }
+                // // timeline precalculate
+                // if (true) {
 
+                currentData.timestep = count; // TODO temperal timestep
+                count++;
+                // make copy of axis data
+                currentData.data = currentData.slice();
+                // currentData.push(timeScale(axis_arr[i].timestep))
+                // adding window
+                for (let w = 0; w<windowSurrounding; w++)
+                {
+                    let currentIndex = i -w;
+                    let currentWData;
+                    if (currentIndex<0) // bounder problem
+                        currentIndex = 0;
+                    currentWData = axis_arr[currentIndex].slice();
+                    // currentWData.push(timeScale(axis_arr[currentIndex].timestep))
+                    currentWData.forEach(d=>{
+                        currentData.push(d);
+                    });
+                }
+                for (let w = 0; w<windowSurrounding; w++)
+                {
+                    let currentIndex = i + w;
+                    let currentWData;
+                    if (currentIndex > timeLength-1) // bounder problem
+                        currentIndex = timeLength-1;
+                    currentWData = axis_arr[currentIndex];
+                    // currentWData.push(timeScale(axis_arr[currentIndex].timestep))
+                    currentWData.forEach(d=>{
+                        currentData.push(d);
+                    });
+                }
+                if (isKeepUndefined)
+                {
+                    for (let i = 0; i< currentData.length; i++){
+                        if (currentData[i]===null||currentData[i]===undefined)
+                            currentData[i] = -1;
+                    }
+                }
+                lastRadar = currentData;
+                dataIn.push(currentData);
+            }
+            return index;
+            // return cluster_info.findIndex(c=>distance(c.__metrics.normalize,axis_arr)<=c.radius);
+        })
+        lastRadar.__deltaTimestep = timeLength - lastRadar.__timestep;
+    });
+    timeSpacedata = dataIn;
+    return dataIn;
+}
 function handle_data_umap(tsnedata) {
     const dataIn = handle_data_model(tsnedata,true);
     // if (!umapopt.opt)
@@ -2825,7 +3008,9 @@ function handle_data_umap(tsnedata) {
             // nNeighbors: 15, // The number of nearest neighbors to construct the fuzzy manifold (15 = default)
             dim: 2, // The number of components (dimensions) to project the data to (2 = default)
             minDist: 1, // The effective minimum distance between embedded points, used with spread to control the clumped/dispersed nature of the embedding (0.1 = default)
-            supervisor: true,
+            supervisor: false,
+            random:()=>0,
+            timeFactor:2,
         };
     umapTS.graphicopt(umapopt).color(colorCluster).init(dataIn, cluster_info);
 }
@@ -2836,14 +3021,30 @@ function handle_data_tsne(tsnedata) {
             epsilon: 20, // epsilon is learning rate (10 = default)
             perplexity: Math.round(dataIn.length / cluster_info.length), // roughly how many neighbors each point influences (30 = default)
             dim: 2, // dimensionality of the embedding (2 = default)
+            timeFactor:2,
         }
     tsneTS.graphicopt(TsneTSopt).color(colorCluster).init(dataIn, cluster_info);
 }
 function handle_data_pca(tsnedata) {
-    const dataIn = handle_data_model(tsnedata);
-    // if (!PCAopt.opt)
-        PCAopt.opt = {
-            dim: 2, // dimensionality of the embedding (2 = default)
-        };
+    let dataIn=[];
+    let allPoint = PCAopt.opt&&PCAopt.opt.allPoint;
+    if (PCAopt.opt&&PCAopt.opt.allPoint){
+        dataIn = handle_data_model_full(tsnedata)
+    }else
+        dataIn = handle_data_model(tsnedata);
+    PCAopt.opt = {
+        dim: 2, // dimensionality of the embedding (2 = default)
+        allPoint: allPoint
+    };
     pcaTS.graphicopt(PCAopt).color(colorCluster).init(dataIn, cluster_info);
+}
+function handle_data_scatterplot(tsnedata) {
+    const dataIn = handle_data_model(tsnedata);
+        scatterplotopt.opt = {
+            var1: 0, // dimensionality of the embedding (2 = default)
+            var2: 1, // dimensionality of the embedding (2 = default)
+            var3: 0, // dimensionality of the embedding (2 = default)
+            dim: 2,
+        };
+    scatterplotTS.graphicopt(scatterplotopt).color(colorCluster).init(dataIn, cluster_info);
 }

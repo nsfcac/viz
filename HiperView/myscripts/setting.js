@@ -219,15 +219,15 @@ function newdatatoFormat (data,separate){
     });
     serviceList_selected = serviceList.map((d,i)=>{return{text:d,index:i}});
     serviceFullList = serviceLists2serviceFullList(serviceLists);
-    scaleService = serviceFullList.map(d=>d3.scaleLinear().domain(d.range));
-
+    // scaleService = serviceFullList.map(d=>d3.scaleLinear().domain(d.range));
+    scaleService = serviceLists.map(d=>d.sub.map(sub=>d3.scaleLinear().domain(sub.range)));
     const host_name = Object.keys(hostList.data.hostlist);
     sampleS = {};
     tsnedata = {};
     sampleS['timespan'] = data.map(d=>new Date(d.time||d.timestamp))
     data.forEach(d=>{
         host_name.forEach(h=> {
-            serviceListattr.forEach(attr => {
+            serviceListattr.forEach((attr,i) => {
                  if (sampleS[h]===undefined) {
                      sampleS[h] = {};
                      tsnedata[h] = [];
@@ -241,7 +241,9 @@ function newdatatoFormat (data,separate){
                  }
                  let retievedData = processResult_csv(d[h+separate+attr],attr);
                 sampleS[h][attr].push(retievedData);
-                tsnedata[h][currentIndex].push(retievedData===null?0:scaleService[i](retievedData)||0);
+                retievedData.forEach((r,sub_index)=> {
+                    tsnedata[h][currentIndex].push(r === null ? 0 : scaleService[i][sub_index](r) || 0);
+                });
             });
         })
     });
@@ -1093,7 +1095,7 @@ function recomendName (clusterarr,haveDescription){
 
 function recomendColor (clusterarr) {
     let colorCa = colorScaleList['customschemeCategory'].slice();
-    if (clusterarr.length>10 && clusterarr.length<21)
+    if (clusterarr.length>9 && clusterarr.length<21)
         colorCa = d3.schemeCategory20;
     else if (clusterarr.length>20)
         colorCa = clusterarr.map((d,i)=>d3.interpolateTurbo(i/(clusterarr.length-1)));
@@ -1200,6 +1202,22 @@ function onClusterHistogram(){
     }
 }
 
+function calculateServiceRange() {
+    serviceFullList_Fullrange = _.cloneDeep(serviceFullList);
+    serviceList_selected.forEach((s, si) => {
+        const sa = serviceListattr[s.index]
+        let min = +Infinity;
+        let max = -Infinity;
+        _.without(Object.keys(sampleS),'timespan').map(h => {
+            let temp_range = d3.extent(_.flatten(sampleS[h][sa]));
+            if (temp_range[0] < min)
+                min = temp_range[0];
+            if (temp_range[1] > max)
+                max = temp_range[1];
+        });
+        serviceLists[si].sub.forEach(sub => sub.range = [min, max]);
+    })
+}
 
 // ------------------------UI------------------------------
 function initClusterUi() {
